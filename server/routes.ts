@@ -1,7 +1,40 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTweetNoteSchema, insertSettingsSchema } from "@shared/schema";
+import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
+
+function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
+  const date = new Date(tweet.createdAt).toISOString().split("T")[0];
+  const contentTrunc = tweet.content.substring(0, 40).replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  const filename = filenameTemplate
+    .replace("{author_handle}", tweet.authorHandle)
+    .replace("{content_trunc_40}", contentTrunc)
+    .replace("{date}", date)
+    + ".md";
+  const safeName = filename.replace(/[/\\?%*:|"<>]/g, "-");
+
+  const frontmatter = [
+    "---",
+    `tweet_url: ${tweet.tweetUrl}`,
+    `author_handle: ${tweet.authorHandle}`,
+    `created_at: ${tweet.createdAt}`,
+    tweet.threadPosition ? `thread_position: ${tweet.threadPosition}` : null,
+    `conversation_id: ${tweet.conversationId}`,
+    `tweet_id: ${tweet.tweetId}`,
+    `tags: [${(tweet.tags || []).join(", ")}]`,
+    tweet.quotedTweetId ? `quoted_tweet_id: ${tweet.quotedTweetId}` : null,
+    tweet.inReplyToTweetId ? `in_reply_to_tweet_id: ${tweet.inReplyToTweetId}` : null,
+    "---",
+  ].filter(Boolean).join("\n");
+
+  const body = tweet.content
+    .replace(/@(\w+)/g, "[[@$1]]")
+    .replace(/#(\w+)/g, "[[#$1]]");
+
+  const content = `${frontmatter}\n\n${body}\n`;
+
+  return { filename: safeName, content };
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -169,6 +202,103 @@ export async function registerRoutes(
     try {
       const logs = await storage.getRecentSyncLogs();
       res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── X Account ──────────────────────────────────────────
+
+  app.get("/api/x-account/status", async (_req, res) => {
+    try {
+      const token = process.env.X_BEARER_TOKEN;
+      if (!token) {
+        return res.json({ connected: false, message: "No bearer token configured" });
+      }
+      const response = await fetch("https://api.x.com/2/users/me?user.fields=profile_image_url,description,public_metrics", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return res.json({ connected: false, message: "Bearer token is invalid or expired. Please reconnect." });
+        }
+        return res.json({ connected: false, message: "Could not reach X API. Please try again later." });
+      }
+      const data = await response.json();
+      res.json({
+        connected: true,
+        user: {
+          id: data.data.id,
+          name: data.data.name,
+          username: data.data.username,
+          profileImageUrl: data.data.profile_image_url,
+          description: data.data.description,
+          followers: data.data.public_metrics?.followers_count,
+          following: data.data.public_metrics?.following_count,
+          tweetCount: data.data.public_metrics?.tweet_count,
+        },
+      });
+    } catch (err: any) {
+      res.json({ connected: false, message: "Could not connect to X API." });
+    }
+  });
+
+  app.post("/api/x-account/verify", async (req, res) => {
+    try {
+      const { bearerToken } = req.body;
+      if (!bearerToken || typeof bearerToken !== "string") {
+        return res.status(400).json({ connected: false, message: "Bearer token is required." });
+      }
+      const response = await fetch("https://api.x.com/2/users/me?user.fields=profile_image_url,description,public_metrics", {
+        headers: { Authorization: `Bearer ${bearerToken.trim()}` },
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return res.status(401).json({ connected: false, message: "Invalid bearer token. Please check your token and try again." });
+        }
+        return res.status(502).json({ connected: false, message: "Could not reach X API. Please try again later." });
+      }
+      const data = await response.json();
+      res.json({
+        connected: true,
+        user: {
+          id: data.data.id,
+          name: data.data.name,
+          username: data.data.username,
+          profileImageUrl: data.data.profile_image_url,
+          description: data.data.description,
+          followers: data.data.public_metrics?.followers_count,
+          following: data.data.public_metrics?.following_count,
+          tweetCount: data.data.public_metrics?.tweet_count,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ connected: false, message: "Could not connect to X API." });
+    }
+  });
+
+  // ─── Export / Download ─────────────────────────────────────
+
+  app.get("/api/export/:id", async (req, res) => {
+    try {
+      const tweet = await storage.getTweetNote(req.params.id);
+      if (!tweet) return res.status(404).json({ message: "Tweet note not found" });
+      const s = await storage.getSettings();
+      const md = generateMarkdown(tweet, s.filenameTemplate);
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${md.filename}"`);
+      res.send(md.content);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/export", async (_req, res) => {
+    try {
+      const tweets = await storage.getAllTweetNotes();
+      const s = await storage.getSettings();
+      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+      res.json(files);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
