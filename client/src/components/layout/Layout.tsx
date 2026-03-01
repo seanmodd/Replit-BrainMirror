@@ -18,7 +18,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-primary">
             <Twitter size={20} />
           </div>
-          <h1 className="font-semibold tracking-tight">SecondBrain</h1>
+          <h1 className="font-semibold tracking-tight">BrainMirror</h1>
         </div>
         
         <nav className="flex-1 p-4 space-y-1">
@@ -70,7 +70,7 @@ export default function Layout({ children }: LayoutProps) {
         <header className="md:hidden h-14 border-b border-border bg-card flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <Twitter size={20} className="text-primary" />
-            <span className="font-semibold">SecondBrain</span>
+            <span className="font-semibold">BrainMirror</span>
           </div>
           <Button variant="ghost" size="icon">
             <Menu size={20} />
