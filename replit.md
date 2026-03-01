@@ -50,11 +50,20 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - Verification via `/2/users/by/username/:username` endpoint
 - Token + username stored in process.env at runtime
 
+## GitHub Integration (Obsidian Sync)
+
+- Uses Replit GitHub connector (OAuth via `@octokit/rest`)
+- `server/github.ts` — GitHub client with token refresh from Replit connector
+- Push notes directly to GitHub repo (e.g. `seanmodd/brainmirror`)
+- Obsidian syncs from the GitHub repo automatically
+- Endpoints: `GET /api/github/status`, `POST /api/github/push`
+
 ## Obsidian Export
 
 - Notes exported as Obsidian-compatible Markdown with YAML frontmatter
 - Wiki-links for authors (`[[@handle]]`) and hashtags (`[[#tag]]`)
-- ZIP download for bulk export into Obsidian vault (Obsidian Sync handles cloud distribution)
+- ZIP download for bulk export into Obsidian vault
+- Individual file download also available
 
 ## Style
 

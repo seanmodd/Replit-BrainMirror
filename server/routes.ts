@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
+import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
 
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const date = new Date(tweet.createdAt).toISOString().split("T")[0];
@@ -362,6 +363,41 @@ export async function registerRoutes(
 
       await archive.finalize();
     } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── GitHub Integration ────────────────────────────────────
+
+  app.get("/api/github/status", async (_req, res) => {
+    try {
+      const octokit = await getUncachableGitHubClient();
+      const { data: user } = await octokit.users.getAuthenticated();
+      res.json({ connected: true, username: user.login, avatar: user.avatar_url });
+    } catch (err: any) {
+      res.json({ connected: false, message: err.message });
+    }
+  });
+
+  app.post("/api/github/push", async (req, res) => {
+    try {
+      const { owner, repo, folder } = req.body;
+      if (!owner || !repo) {
+        return res.status(400).json({ message: "Owner and repo are required." });
+      }
+      if (folder && (/\.\./.test(folder) || folder.startsWith("/") || folder.startsWith("\\"))) {
+        return res.status(400).json({ message: "Invalid folder path." });
+      }
+      const tweets = await storage.getAllTweetNotes();
+      if (tweets.length === 0) {
+        return res.status(404).json({ message: "No notes to push." });
+      }
+      const s = await storage.getSettings();
+      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+      const result = await pushFilesToGitHub(owner, repo, files, folder || "");
+      res.json(result);
+    } catch (err: any) {
+      console.error("GitHub push error:", err);
       res.status(500).json({ message: err.message });
     }
   });

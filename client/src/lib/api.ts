@@ -43,6 +43,10 @@ export const api = {
     status: () => fetchJSON<any>("/x-account/status"),
     verify: (data: { bearerToken: string; username: string }) => fetchJSON<any>("/x-account/verify", { method: "POST", body: JSON.stringify(data) }),
   },
+  github: {
+    status: () => fetchJSON<any>("/github/status"),
+    push: (data: { owner: string; repo: string; folder?: string }) => fetchJSON<any>("/github/push", { method: "POST", body: JSON.stringify(data) }),
+  },
   exportNote: (id: string) => `${API_BASE}/export/${id}`,
   exportAll: () => fetchJSON<any[]>("/export"),
 };

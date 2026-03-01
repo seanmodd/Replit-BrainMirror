@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield } from "lucide-react";
+import { Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield, Github, Upload } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -103,26 +103,16 @@ export default function Settings() {
       <div className="space-y-6 pb-10">
         <XAccountCard />
 
+        <GitHubSyncCard />
+
         <Card>
           <CardHeader>
-            <CardTitle>Export to Obsidian</CardTitle>
-            <CardDescription>Download your tweet notes as Obsidian-compatible Markdown files. Drop them into your vault and Obsidian Sync will handle the rest.</CardDescription>
+            <CardTitle>Manual Export</CardTitle>
+            <CardDescription>Download notes directly if you prefer manual file management.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start gap-3 text-sm text-muted-foreground bg-muted/30 p-3 rounded-md">
-              <Download className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-foreground mb-1">How it works</p>
-                <ol className="list-decimal pl-4 space-y-1">
-                  <li>Download your notes as a ZIP file</li>
-                  <li>Unzip into your Obsidian vault folder (e.g. a "Twitter" subfolder)</li>
-                  <li>Obsidian Sync will automatically push the new files to all your devices</li>
-                </ol>
-              </div>
-            </div>
-
             <div className="flex gap-3">
-              <Button data-testid="button-export-zip" variant="default" onClick={handleExportZip}>
+              <Button data-testid="button-export-zip" variant="outline" onClick={handleExportZip}>
                 <Download className="mr-2 h-4 w-4" />
                 Download All as ZIP
               </Button>
@@ -397,6 +387,131 @@ function XAccountCard() {
               </form>
             )}
           </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function GitHubSyncCard() {
+  const { toast } = useToast();
+  const [repoInput, setRepoInput] = useState("seanmodd/brainmirror");
+  const [folderInput, setFolderInput] = useState("");
+
+  const { data: ghStatus, isLoading: ghLoading } = useQuery({
+    queryKey: ["/api/github/status"],
+    queryFn: api.github.status,
+  });
+
+  const pushMutation = useMutation({
+    mutationFn: api.github.push,
+    onSuccess: (data) => {
+      const total = data.created.length + data.updated.length;
+      const parts = [];
+      if (data.created.length) parts.push(`${data.created.length} created`);
+      if (data.updated.length) parts.push(`${data.updated.length} updated`);
+      if (data.unchanged.length) parts.push(`${data.unchanged.length} unchanged`);
+      if (data.errors.length) parts.push(`${data.errors.length} failed`);
+      toast({
+        title: `Pushed ${total} notes to GitHub`,
+        description: parts.join(", "),
+        variant: data.errors.length ? "destructive" : "default",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Push failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handlePush = () => {
+    const [owner, repo] = repoInput.split("/");
+    if (!owner || !repo) {
+      toast({ title: "Invalid repo", description: "Use the format owner/repo", variant: "destructive" });
+      return;
+    }
+    pushMutation.mutate({ owner, repo, folder: folderInput || undefined });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Github className="h-5 w-5" />
+          Obsidian via GitHub
+        </CardTitle>
+        <CardDescription>Push your tweet notes directly to your GitHub repo. Obsidian syncs automatically from GitHub.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {ghLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : ghStatus?.connected ? (
+          <>
+            <div data-testid="status-github-connected" className="flex items-center gap-3 p-3 border border-green-500/30 rounded-lg bg-green-500/5">
+              {ghStatus.avatar && (
+                <img data-testid="img-github-avatar" src={ghStatus.avatar} alt={ghStatus.username} className="w-8 h-8 rounded-full" />
+              )}
+              <div className="flex-1">
+                <div data-testid="text-github-username" className="font-medium flex items-center gap-2">
+                  {ghStatus.username}
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                </div>
+                <div className="text-xs text-green-500">GitHub connected</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="github-repo">Repository</Label>
+                <Input
+                  data-testid="input-github-repo"
+                  id="github-repo"
+                  value={repoInput}
+                  onChange={e => setRepoInput(e.target.value)}
+                  placeholder="owner/repo"
+                  className="font-mono text-sm bg-muted/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="github-folder">Folder (optional)</Label>
+                <Input
+                  data-testid="input-github-folder"
+                  id="github-folder"
+                  value={folderInput}
+                  onChange={e => setFolderInput(e.target.value)}
+                  placeholder="e.g. Twitter"
+                  className="font-mono text-sm bg-muted/50"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to push to the repo root, or specify a subfolder.
+                </p>
+              </div>
+              <Button
+                data-testid="button-push-github"
+                onClick={handlePush}
+                disabled={pushMutation.isPending || !repoInput.trim()}
+              >
+                {pushMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Pushing to GitHub...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Push Notes to GitHub
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/20">
+            <Github className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <div className="font-medium">GitHub not connected</div>
+              <div className="text-xs text-muted-foreground">Connect GitHub via the Replit integrations panel to enable syncing.</div>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
