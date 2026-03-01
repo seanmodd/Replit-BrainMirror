@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 // Dynamically import to avoid SSR issues if this were a Next.js app, 
 // but also good for heavy viz libraries
-import { ForceGraph2D } from 'react-force-graph-2d';
+import ForceGraph2D from 'react-force-graph-2d';
 
 export default function GraphView() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
