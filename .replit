@@ -43,3 +43,9 @@ waitForPort = 5000
 stack = "MOCKUP_JS"
 mockupState = "FULLSTACK"
 integrations = ["github:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+X_CLIENT_ID = "X0hrdEJrWU5ZZDRhbG5SN0hQSkM6MTpjaQ"
+X_CLIENT_SECRET = "hJ4JrZVXPAly8wb-GXaxgVrqMapFE2QhFNa3fKLZWdxab04IfJ"
