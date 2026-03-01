@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2 } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -21,21 +21,41 @@ export default function Dashboard() {
     queryFn: () => api.tweets.list(),
   });
 
-  const syncMutation = useMutation({
+  const invalidateAfterSync = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sync-logs"] });
+  };
+
+  const publicSyncMutation = useMutation({
+    mutationFn: () => api.sync.public(["tweets", "likes"]),
+    onSuccess: (data) => {
+      invalidateAfterSync();
+      toast({
+        title: "Public sync complete",
+        description: `${data.imported} new, ${data.skipped} already imported (${data.total} total)`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Public sync failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const bookmarkSyncMutation = useMutation({
     mutationFn: api.sync.bookmarks,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sync-logs"] });
+      invalidateAfterSync();
       toast({
         title: "Bookmark sync complete",
         description: `${data.imported} new, ${data.skipped} already imported (${data.total} total bookmarks)`,
       });
     },
     onError: (err: any) => {
-      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+      toast({ title: "Bookmark sync failed", description: err.message, variant: "destructive" });
     },
   });
+
+  const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending;
 
   const recentTweets = tweets?.slice(0, 3) || [];
 
@@ -46,19 +66,37 @@ export default function Dashboard() {
           <h1 data-testid="text-dashboard-title" className="text-3xl font-bold tracking-tight mb-1 text-foreground">Overview</h1>
           <p className="text-muted-foreground">Your Obsidian Twitter vault at a glance.</p>
         </div>
-        <Button
-          data-testid="button-sync-now"
-          className="w-fit"
-          onClick={() => syncMutation.mutate()}
-          disabled={syncMutation.isPending}
-        >
-          {syncMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="mr-2 h-4 w-4" />
-          )}
-          {syncMutation.isPending ? "Syncing..." : "Sync Now"}
-        </Button>
+        <div className="relative">
+          <div className="flex gap-2">
+            <Button
+              data-testid="button-sync-public"
+              variant="outline"
+              className="w-fit"
+              onClick={() => publicSyncMutation.mutate()}
+              disabled={isSyncing}
+            >
+              {publicSyncMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {publicSyncMutation.isPending ? "Syncing..." : "Sync Public"}
+            </Button>
+            <Button
+              data-testid="button-sync-bookmarks"
+              className="w-fit"
+              onClick={() => bookmarkSyncMutation.mutate()}
+              disabled={isSyncing}
+            >
+              {bookmarkSyncMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Bookmark className="mr-2 h-4 w-4" />
+              )}
+              {bookmarkSyncMutation.isPending ? "Syncing..." : "Sync Bookmarks"}
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

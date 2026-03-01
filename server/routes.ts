@@ -4,7 +4,7 @@ import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
 import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
-import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId } from "./xauth";
+import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets, fetchUserLikes } from "./xauth";
 
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const date = new Date(tweet.createdAt).toISOString().split("T")[0];
@@ -347,6 +347,120 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("OAuth callback error:", err);
       res.redirect("/settings?oauth=error&message=" + encodeURIComponent(err.message));
+    }
+  });
+
+  app.post("/api/sync/public", async (req, res) => {
+    try {
+      const bearerToken = process.env.X_BEARER_TOKEN;
+      const username = process.env.X_USERNAME;
+      if (!bearerToken || !username) {
+        return res.status(401).json({ message: "Bearer token and username not configured. Please verify your X account first." });
+      }
+
+      const { types } = req.body;
+      const syncTypes: string[] = Array.isArray(types) ? types : ["tweets", "likes"];
+
+      const userLookup = await fetch(
+        `https://api.x.com/2/users/by/username/${encodeURIComponent(username)}?user.fields=id`,
+        { headers: { Authorization: `Bearer ${bearerToken}` } }
+      );
+      if (!userLookup.ok) {
+        const errText = await userLookup.text();
+        console.error(`User lookup failed (${userLookup.status}):`, errText);
+        if (userLookup.status === 402) {
+          return res.status(402).json({ message: "X API credits depleted. Add credits in the X Developer Portal." });
+        }
+        return res.status(502).json({ message: "Could not look up user." });
+      }
+      const userData = await userLookup.json();
+      if (!userData.data?.id) {
+        return res.status(404).json({ message: `User @${username} not found.` });
+      }
+      const userId = userData.data.id;
+
+      const syncLog = await storage.createSyncLog({ status: "running", tweetsProcessed: 0 });
+      let totalImported = 0;
+      let totalSkipped = 0;
+      let totalFetched = 0;
+
+      try {
+        const importTweets = async (tweetList: any[], authorMap: Map<string, any>) => {
+          let imported = 0;
+          let skipped = 0;
+          for (const tw of tweetList) {
+            const existing = await storage.getTweetNoteByTweetId(tw.id);
+            if (existing) { skipped++; continue; }
+
+            const author = authorMap.get(tw.author_id);
+            const authorHandle = author?.username || username;
+            const authorName = author?.name || authorHandle;
+
+            const tags: string[] = [];
+            if (tw.entities?.hashtags) {
+              for (const ht of tw.entities.hashtags) tags.push(`#${ht.tag}`);
+            }
+            const links: string[] = [];
+            if (tw.entities?.urls) {
+              for (const url of tw.entities.urls) links.push(url.expanded_url);
+            }
+
+            const replyToId = tw.referenced_tweets?.find((r: any) => r.type === "replied_to")?.id;
+            const quotedId = tw.referenced_tweets?.find((r: any) => r.type === "quoted")?.id;
+
+            await storage.createTweetNote({
+              tweetId: tw.id,
+              conversationId: tw.conversation_id || tw.id,
+              tweetUrl: `https://x.com/${authorHandle}/status/${tw.id}`,
+              authorHandle,
+              authorName,
+              createdAt: tw.created_at,
+              content: tw.text,
+              tags,
+              threadPosition: null,
+              quotedTweetId: quotedId || null,
+              inReplyToTweetId: replyToId || null,
+              links,
+            });
+            imported++;
+          }
+          return { imported, skipped };
+        };
+
+        if (syncTypes.includes("tweets")) {
+          const { tweets, authors } = await fetchUserTweets(bearerToken, userId);
+          const result = await importTweets(tweets, authors);
+          totalImported += result.imported;
+          totalSkipped += result.skipped;
+          totalFetched += tweets.length;
+        }
+
+        if (syncTypes.includes("likes")) {
+          const { tweets, authors } = await fetchUserLikes(bearerToken, userId);
+          const result = await importTweets(tweets, authors);
+          totalImported += result.imported;
+          totalSkipped += result.skipped;
+          totalFetched += tweets.length;
+        }
+
+        await storage.updateSyncLog(syncLog.id, {
+          status: "success",
+          tweetsProcessed: totalImported,
+          completedAt: new Date(),
+        });
+
+        res.json({ imported: totalImported, skipped: totalSkipped, total: totalFetched, types: syncTypes });
+      } catch (err: any) {
+        await storage.updateSyncLog(syncLog.id, {
+          status: "error",
+          errorMessage: err.message,
+          completedAt: new Date(),
+        });
+        throw err;
+      }
+    } catch (err: any) {
+      console.error("Public sync error:", err);
+      res.status(500).json({ message: err.message });
     }
   });
 

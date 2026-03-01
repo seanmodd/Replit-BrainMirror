@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield, Github, Upload } from "lucide-react";
+import { Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield, Github, Upload, RefreshCw, Bookmark } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -102,6 +102,8 @@ export default function Settings() {
 
       <div className="space-y-6 pb-10">
         <XAccountCard />
+
+        <BookmarkSyncCard />
 
         <GitHubSyncCard />
 
@@ -213,15 +215,12 @@ function XAccountCard() {
   const [usernameInput, setUsernameInput] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [showConnectForm, setShowConnectForm] = useState(false);
+  const [syncTweets, setSyncTweets] = useState(true);
+  const [syncLikes, setSyncLikes] = useState(true);
 
   const { data: xStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["/api/x-account/status"],
     queryFn: api.xAccount.status,
-  });
-
-  const { data: oauthStatus } = useQuery({
-    queryKey: ["/api/x-auth/status"],
-    queryFn: api.xAuth.status,
   });
 
   const verifyMutation = useMutation({
@@ -240,62 +239,106 @@ function XAccountCard() {
     },
   });
 
+  const publicSyncMutation = useMutation({
+    mutationFn: () => {
+      const types: string[] = [];
+      if (syncTweets) types.push("tweets");
+      if (syncLikes) types.push("likes");
+      return api.sync.public(types);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: "Public sync complete",
+        description: `${data.imported} new, ${data.skipped} already imported (${data.total} total). Synced: ${data.types.join(", ")}`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tokenInput.trim() || !usernameInput.trim()) return;
     verifyMutation.mutate({ bearerToken: tokenInput.trim(), username: usernameInput.trim() });
   };
 
-  const handleAuthorize = async () => {
-    try {
-      const { url } = await api.xAuth.authorize();
-      window.open(url, "_blank");
-    } catch (err: any) {
-      toast({ title: "Authorization failed", description: err.message, variant: "destructive" });
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>X Account Connection</CardTitle>
-        <CardDescription>Connect your X (Twitter) account to enable bookmark syncing.</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <XIcon />
+          X Account — Public Sync
+        </CardTitle>
+        <CardDescription>Connect with a Bearer Token to sync your public tweets, retweets, and likes. No OAuth needed.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {statusLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : xStatus?.connected ? (
-          <div className="flex items-center justify-between p-4 border border-green-500/30 rounded-lg bg-green-500/5">
-            <div className="flex items-center gap-4">
-              {xStatus.user.profileImageUrl ? (
-                <img 
-                  src={xStatus.user.profileImageUrl} 
-                  alt={xStatus.user.name} 
-                  className="w-12 h-12 rounded-full border-2 border-green-500/30"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#1DA1F2]/20 flex items-center justify-center text-[#1DA1F2]">
-                  <XIcon />
-                </div>
-              )}
-              <div>
-                <div className="font-semibold flex items-center gap-2">
-                  {xStatus.user.name}
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                </div>
-                <div className="text-sm text-muted-foreground">@{xStatus.user.username}</div>
-                <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                  <span>{xStatus.user.followers?.toLocaleString()} followers</span>
-                  <span>{xStatus.user.following?.toLocaleString()} following</span>
-                  <span>{xStatus.user.tweetCount?.toLocaleString()} posts</span>
+          <>
+            <div className="flex items-center justify-between p-4 border border-green-500/30 rounded-lg bg-green-500/5">
+              <div className="flex items-center gap-4">
+                {xStatus.user.profileImageUrl ? (
+                  <img 
+                    src={xStatus.user.profileImageUrl} 
+                    alt={xStatus.user.name} 
+                    className="w-12 h-12 rounded-full border-2 border-green-500/30"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#1DA1F2]/20 flex items-center justify-center text-[#1DA1F2]">
+                    <XIcon />
+                  </div>
+                )}
+                <div>
+                  <div className="font-semibold flex items-center gap-2">
+                    {xStatus.user.name}
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                  <div className="text-sm text-muted-foreground">@{xStatus.user.username}</div>
+                  <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                    <span>{xStatus.user.followers?.toLocaleString()} followers</span>
+                    <span>{xStatus.user.following?.toLocaleString()} following</span>
+                    <span>{xStatus.user.tweetCount?.toLocaleString()} posts</span>
+                  </div>
                 </div>
               </div>
+              <div className="text-xs text-muted-foreground text-right">
+                <div className="text-green-500 font-medium">Active</div>
+                <span>via env secret</span>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground text-right">
-              <div className="text-green-500 font-medium">Active</div>
-              <span>via env secret</span>
+
+            <div className="border-t border-border pt-4 mt-2">
+              <div className="font-medium text-sm mb-3">What to sync</div>
+              <div className="flex items-center gap-4 mb-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={syncTweets} onChange={e => setSyncTweets(e.target.checked)} className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
+                  Tweets & Retweets
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={syncLikes} onChange={e => setSyncLikes(e.target.checked)} className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
+                  Liked Tweets
+                </label>
+              </div>
+              <Button
+                data-testid="button-sync-public"
+                variant="outline"
+                size="sm"
+                onClick={() => publicSyncMutation.mutate()}
+                disabled={publicSyncMutation.isPending || (!syncTweets && !syncLikes)}
+              >
+                {publicSyncMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing...</>
+                ) : (
+                  <><RefreshCw className="mr-2 h-4 w-4" />Sync Public Activity</>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">Uses your Bearer Token — no additional setup needed. Fetches up to 100 recent items per type.</p>
             </div>
-          </div>
+          </>
         ) : (
           <>
             {!showConnectForm ? (
@@ -402,52 +445,110 @@ function XAccountCard() {
             )}
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
 
-        <div className="border-t border-border pt-4 mt-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium text-sm flex items-center gap-2">
-                Bookmark Sync Access
-                {oauthStatus?.oauthConnected ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {oauthStatus?.oauthConnected
-                  ? "OAuth connected — bookmark syncing is active."
-                  : "Authorize with X to enable automatic bookmark syncing."}
-              </p>
+function BookmarkSyncCard() {
+  const { toast } = useToast();
+
+  const { data: oauthStatus } = useQuery({
+    queryKey: ["/api/x-auth/status"],
+    queryFn: api.xAuth.status,
+  });
+
+  const handleAuthorize = async () => {
+    try {
+      const { url } = await api.xAuth.authorize();
+      window.open(url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Authorization failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const bookmarkSyncMutation = useMutation({
+    mutationFn: api.sync.bookmarks,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tweets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({
+        title: "Bookmark sync complete",
+        description: `${data.imported} new, ${data.skipped} already imported (${data.total} total bookmarks)`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bookmark className="h-5 w-5" />
+          Advanced — Bookmark Sync
+        </CardTitle>
+        <CardDescription>Requires OAuth to access your private bookmarks. This is a more advanced setup with additional X Developer Portal configuration.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-medium text-sm flex items-center gap-2">
+              OAuth Status
+              {oauthStatus?.oauthConnected ? (
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              ) : (
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
-            {!oauthStatus?.oauthConnected && (
-              <Button
-                data-testid="button-authorize-oauth"
-                variant="outline"
-                size="sm"
-                onClick={handleAuthorize}
-                disabled={!oauthStatus?.hasClientCredentials}
-              >
-                Authorize Bookmarks
-              </Button>
-            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              {oauthStatus?.oauthConnected
+                ? "OAuth connected — bookmark syncing is active."
+                : "Authorize with X to enable bookmark syncing."}
+            </p>
           </div>
-          {!oauthStatus?.hasClientCredentials && !oauthStatus?.oauthConnected && (
-            <div className="mt-3 text-xs text-muted-foreground bg-muted/30 p-3 rounded-md space-y-2">
-              <p className="font-medium text-foreground">Setup required for bookmark syncing:</p>
-              <ol className="list-decimal pl-4 space-y-1">
-                <li>In the <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="text-[#A78BFA] underline">X Developer Portal</a>, open your app settings</li>
-                <li>Under "User authentication settings", click <strong>Set up</strong></li>
-                <li>Set App permissions to <strong>Read</strong></li>
-                <li>Set Type of App to <strong>Web App, Automated App or Bot</strong></li>
-                <li>Set Callback URL to: <code className="bg-muted px-1 rounded font-mono text-[10px] break-all">{oauthStatus?.redirectUri || "loading..."}</code></li>
-                <li>Set Website URL to any valid URL (e.g. https://brainmirror.replit.app)</li>
-                <li>Save, then copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
-                <li>Add them as Replit secrets: <code className="bg-muted px-1 rounded font-mono">X_CLIENT_ID</code> and <code className="bg-muted px-1 rounded font-mono">X_CLIENT_SECRET</code></li>
-              </ol>
-            </div>
+          {oauthStatus?.oauthConnected ? (
+            <Button
+              data-testid="button-sync-bookmarks"
+              variant="outline"
+              size="sm"
+              onClick={() => bookmarkSyncMutation.mutate()}
+              disabled={bookmarkSyncMutation.isPending}
+            >
+              {bookmarkSyncMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing...</>
+              ) : (
+                <><RefreshCw className="mr-2 h-4 w-4" />Sync Bookmarks</>
+              )}
+            </Button>
+          ) : (
+            <Button
+              data-testid="button-authorize-oauth"
+              variant="outline"
+              size="sm"
+              onClick={handleAuthorize}
+              disabled={!oauthStatus?.hasClientCredentials}
+            >
+              Authorize Bookmarks
+            </Button>
           )}
         </div>
+        {!oauthStatus?.hasClientCredentials && !oauthStatus?.oauthConnected && (
+          <div className="mt-3 text-xs text-muted-foreground bg-muted/30 p-3 rounded-md space-y-2">
+            <p className="font-medium text-foreground">Setup required for bookmark syncing:</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>In the <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="text-[#A78BFA] underline">X Developer Portal</a>, open your app settings</li>
+              <li>Under "User authentication settings", click <strong>Set up</strong></li>
+              <li>Set App permissions to <strong>Read</strong></li>
+              <li>Set Type of App to <strong>Web App, Automated App or Bot</strong></li>
+              <li>Set Callback URL to: <code className="bg-muted px-1 rounded font-mono text-[10px] break-all">{oauthStatus?.redirectUri || "loading..."}</code></li>
+              <li>Set Website URL to any valid URL (e.g. https://brainmirror.replit.app)</li>
+              <li>Save, then copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+              <li>Add them as Replit secrets: <code className="bg-muted px-1 rounded font-mono">X_CLIENT_ID</code> and <code className="bg-muted px-1 rounded font-mono">X_CLIENT_SECRET</code></li>
+            </ol>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

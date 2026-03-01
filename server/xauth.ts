@@ -232,3 +232,65 @@ export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; autho
 export function getRedirectUriForDisplay(): string {
   return getRedirectUri();
 }
+
+export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
+  const params = new URLSearchParams({
+    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
+    "user.fields": "name,username",
+    expansions: "author_id",
+    max_results: "100",
+  });
+
+  const response = await fetch(
+    `https://api.x.com/2/users/${userId}/tweets?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${bearerToken}` } }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`User tweets fetch failed (${response.status}):`, errText);
+    if (response.status === 402) throw new Error("X API credits depleted. Add credits in the X Developer Portal.");
+    throw new Error(`Failed to fetch tweets (${response.status})`);
+  }
+
+  const data = await response.json();
+  const tweets: BookmarkTweet[] = data.data || [];
+  const authors = new Map<string, BookmarkAuthor>();
+  if (data.includes?.users) {
+    for (const user of data.includes.users) {
+      authors.set(user.id, user);
+    }
+  }
+  return { tweets, authors };
+}
+
+export async function fetchUserLikes(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
+  const params = new URLSearchParams({
+    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
+    "user.fields": "name,username",
+    expansions: "author_id",
+    max_results: "100",
+  });
+
+  const response = await fetch(
+    `https://api.x.com/2/users/${userId}/liked_tweets?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${bearerToken}` } }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`User likes fetch failed (${response.status}):`, errText);
+    if (response.status === 402) throw new Error("X API credits depleted. Add credits in the X Developer Portal.");
+    throw new Error(`Failed to fetch likes (${response.status})`);
+  }
+
+  const data = await response.json();
+  const tweets: BookmarkTweet[] = data.data || [];
+  const authors = new Map<string, BookmarkAuthor>();
+  if (data.includes?.users) {
+    for (const user of data.includes.users) {
+      authors.set(user.id, user);
+    }
+  }
+  return { tweets, authors };
+}

@@ -50,8 +50,12 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - OAuth 2.0 PKCE: User-level auth for bookmark access via `/2/users/:id/bookmarks`
 - `server/xauth.ts` — OAuth PKCE flow (authorize, callback, token refresh, bookmark fetch)
 - Endpoints: `GET /api/x-auth/status`, `GET /api/x-auth/authorize`, `GET /api/x-auth/callback`
-- Sync: `POST /api/sync/bookmarks` — fetches bookmarks and imports as tweet notes
-- Requires X_CLIENT_ID and X_CLIENT_SECRET environment variables for OAuth
+- Public Sync: `POST /api/sync/public` — fetches user tweets/retweets and likes using Bearer Token (no OAuth)
+- Bookmark Sync: `POST /api/sync/bookmarks` — fetches private bookmarks (requires OAuth)
+- `fetchUserTweets()` and `fetchUserLikes()` in xauth.ts for public sync
+- Requires X_CLIENT_ID and X_CLIENT_SECRET environment variables for OAuth bookmark sync
+- Settings UI: XAccountCard (public sync) and BookmarkSyncCard (OAuth bookmarks) as separate cards
+- Dashboard: Two sync buttons — "Sync Public" and "Sync Bookmarks"
 
 ## GitHub Integration (Obsidian Sync)
 
