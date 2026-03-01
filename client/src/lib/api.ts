@@ -47,6 +47,13 @@ export const api = {
     status: () => fetchJSON<any>("/github/status"),
     push: (data: { owner: string; repo: string; folder?: string }) => fetchJSON<any>("/github/push", { method: "POST", body: JSON.stringify(data) }),
   },
+  xAuth: {
+    status: () => fetchJSON<any>("/x-auth/status"),
+    authorize: () => fetchJSON<any>("/x-auth/authorize"),
+  },
+  sync: {
+    bookmarks: () => fetchJSON<any>("/sync/bookmarks", { method: "POST" }),
+  },
   exportNote: (id: string) => `${API_BASE}/export/${id}`,
   exportAll: () => fetchJSON<any[]>("/export"),
 };

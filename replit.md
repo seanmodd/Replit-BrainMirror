@@ -46,9 +46,12 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 
 ## X/Twitter Integration
 
-- Uses App-Only Bearer Token (not OAuth user context)
-- Verification via `/2/users/by/username/:username` endpoint
-- Token + username stored in process.env at runtime
+- Bearer Token: App-Only auth for profile verification via `/2/users/by/username/:username`
+- OAuth 2.0 PKCE: User-level auth for bookmark access via `/2/users/:id/bookmarks`
+- `server/xauth.ts` — OAuth PKCE flow (authorize, callback, token refresh, bookmark fetch)
+- Endpoints: `GET /api/x-auth/status`, `GET /api/x-auth/authorize`, `GET /api/x-auth/callback`
+- Sync: `POST /api/sync/bookmarks` — fetches bookmarks and imports as tweet notes
+- Requires X_CLIENT_ID and X_CLIENT_SECRET environment variables for OAuth
 
 ## GitHub Integration (Obsidian Sync)
 

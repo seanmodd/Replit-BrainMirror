@@ -219,6 +219,11 @@ function XAccountCard() {
     queryFn: api.xAccount.status,
   });
 
+  const { data: oauthStatus } = useQuery({
+    queryKey: ["/api/x-auth/status"],
+    queryFn: api.xAuth.status,
+  });
+
   const verifyMutation = useMutation({
     mutationFn: api.xAccount.verify,
     onSuccess: (data) => {
@@ -239,6 +244,15 @@ function XAccountCard() {
     e.preventDefault();
     if (!tokenInput.trim() || !usernameInput.trim()) return;
     verifyMutation.mutate({ bearerToken: tokenInput.trim(), username: usernameInput.trim() });
+  };
+
+  const handleAuthorize = async () => {
+    try {
+      const { url } = await api.xAuth.authorize();
+      window.open(url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Authorization failed", description: err.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -388,6 +402,52 @@ function XAccountCard() {
             )}
           </>
         )}
+
+        <div className="border-t border-border pt-4 mt-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-sm flex items-center gap-2">
+                Bookmark Sync Access
+                {oauthStatus?.oauthConnected ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {oauthStatus?.oauthConnected
+                  ? "OAuth connected — bookmark syncing is active."
+                  : "Authorize with X to enable automatic bookmark syncing."}
+              </p>
+            </div>
+            {!oauthStatus?.oauthConnected && (
+              <Button
+                data-testid="button-authorize-oauth"
+                variant="outline"
+                size="sm"
+                onClick={handleAuthorize}
+                disabled={!oauthStatus?.hasClientCredentials}
+              >
+                Authorize Bookmarks
+              </Button>
+            )}
+          </div>
+          {!oauthStatus?.hasClientCredentials && !oauthStatus?.oauthConnected && (
+            <div className="mt-3 text-xs text-muted-foreground bg-muted/30 p-3 rounded-md space-y-2">
+              <p className="font-medium text-foreground">Setup required for bookmark syncing:</p>
+              <ol className="list-decimal pl-4 space-y-1">
+                <li>In the <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="text-[#A78BFA] underline">X Developer Portal</a>, open your app settings</li>
+                <li>Under "User authentication settings", click <strong>Set up</strong></li>
+                <li>Set App permissions to <strong>Read</strong></li>
+                <li>Set Type of App to <strong>Web App, Automated App or Bot</strong></li>
+                <li>Set Callback URL to: <code className="bg-muted px-1 rounded font-mono text-[10px] break-all">{oauthStatus?.redirectUri || "loading..."}</code></li>
+                <li>Set Website URL to any valid URL (e.g. https://brainmirror.replit.app)</li>
+                <li>Save, then copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+                <li>Add them as Replit secrets: <code className="bg-muted px-1 rounded font-mono">X_CLIENT_ID</code> and <code className="bg-muted px-1 rounded font-mono">X_CLIENT_SECRET</code></li>
+              </ol>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

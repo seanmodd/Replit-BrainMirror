@@ -4,6 +4,7 @@ import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
 import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
+import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId } from "./xauth";
 
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const date = new Date(tweet.createdAt).toISOString().split("T")[0];
@@ -309,6 +310,123 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("X API verify error:", err);
       res.status(500).json({ connected: false, message: "Could not connect to X API." });
+    }
+  });
+
+  // ─── X OAuth & Bookmark Sync ───────────────────────────────
+
+  app.get("/api/x-auth/status", async (_req, res) => {
+    try {
+      res.json({
+        oauthConnected: isOAuthConnected(),
+        redirectUri: getRedirectUriForDisplay(),
+        hasClientCredentials: !!(process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET),
+      });
+    } catch (err: any) {
+      res.json({ oauthConnected: false, redirectUri: "", hasClientCredentials: false });
+    }
+  });
+
+  app.get("/api/x-auth/authorize", async (_req, res) => {
+    try {
+      const url = getAuthorizationUrl();
+      res.json({ url });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/x-auth/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.status(400).send("Missing code or state parameter");
+      }
+      await exchangeCodeForTokens(code as string, state as string);
+      res.redirect("/settings?oauth=success");
+    } catch (err: any) {
+      console.error("OAuth callback error:", err);
+      res.redirect("/settings?oauth=error&message=" + encodeURIComponent(err.message));
+    }
+  });
+
+  app.post("/api/sync/bookmarks", async (_req, res) => {
+    try {
+      if (!isOAuthConnected()) {
+        return res.status(401).json({ message: "X account not authorized. Please connect via OAuth first." });
+      }
+
+      const syncLog = await storage.createSyncLog({ status: "running", tweetsProcessed: 0 });
+
+      try {
+        const { tweets: bookmarks, authors } = await fetchBookmarks();
+
+        let imported = 0;
+        let skipped = 0;
+
+        for (const bm of bookmarks) {
+          const existing = await storage.getTweetNoteByTweetId(bm.id);
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          const author = authors.get(bm.author_id);
+          const authorHandle = author?.username || "unknown";
+          const authorName = author?.name || authorHandle;
+
+          const tags: string[] = [];
+          if (bm.entities?.hashtags) {
+            for (const ht of bm.entities.hashtags) {
+              tags.push(`#${ht.tag}`);
+            }
+          }
+
+          const links: string[] = [];
+          if (bm.entities?.urls) {
+            for (const url of bm.entities.urls) {
+              links.push(url.expanded_url);
+            }
+          }
+
+          const replyToId = bm.referenced_tweets?.find(r => r.type === "replied_to")?.id;
+          const quotedId = bm.referenced_tweets?.find(r => r.type === "quoted")?.id;
+
+          await storage.createTweetNote({
+            tweetId: bm.id,
+            conversationId: bm.conversation_id || bm.id,
+            tweetUrl: `https://x.com/${authorHandle}/status/${bm.id}`,
+            authorHandle,
+            authorName,
+            createdAt: bm.created_at,
+            content: bm.text,
+            tags,
+            threadPosition: null,
+            quotedTweetId: quotedId || null,
+            inReplyToTweetId: replyToId || null,
+            links,
+          });
+          imported++;
+        }
+
+        await storage.updateSyncLog(syncLog.id, {
+          status: "success",
+          tweetsProcessed: imported,
+          completedAt: new Date(),
+        });
+
+        res.json({ imported, skipped, total: bookmarks.length });
+      } catch (err: any) {
+        await storage.updateSyncLog(syncLog.id, {
+          status: "error",
+          errorMessage: err.message,
+          completedAt: new Date(),
+        });
+        throw err;
+      }
+    } catch (err: any) {
+      console.error("Bookmark sync error:", err);
+      res.status(500).json({ message: err.message });
     }
   });
 
