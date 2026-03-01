@@ -56,7 +56,7 @@ export default function DatabaseView() {
       <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-none">
         <Badge 
           variant={selectedTag === null ? "default" : "outline"} 
-          className={`cursor-pointer whitespace-nowrap ${selectedTag === null ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
+          className={`cursor-pointer whitespace-nowrap px-3 py-1.5 ${selectedTag === null ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
           onClick={() => setSelectedTag(null)}
         >
           All Notes
@@ -65,7 +65,7 @@ export default function DatabaseView() {
           <Badge 
             key={tag}
             variant={selectedTag === tag ? "default" : "outline"} 
-            className={`cursor-pointer whitespace-nowrap ${selectedTag === tag ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
+            className={`cursor-pointer whitespace-nowrap px-3 py-1.5 ${selectedTag === tag ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
             onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
           >
             #{tag}
