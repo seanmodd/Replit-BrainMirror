@@ -5,15 +5,19 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout/Layout";
-import DatabaseView from "@/pages/DatabaseView";
+import Dashboard from "@/pages/Dashboard";
+import BookmarksView from "@/pages/BookmarksView";
 import GraphView from "@/pages/GraphView";
+import Settings from "@/pages/Settings";
 
 function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={DatabaseView} />
+        <Route path="/" component={Dashboard} />
+        <Route path="/bookmarks" component={BookmarksView} />
         <Route path="/graph" component={GraphView} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

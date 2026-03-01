@@ -1,19 +1,15 @@
 import { useEffect, useState, useMemo } from 'react';
-import { mockNotes, generateGraphData } from '@/lib/mock-data';
-import { Card } from '@/components/ui/card';
+import { mockTweets, mockAuthorHubs, generateGraphData } from '@/lib/mock-data';
 import { SlidersHorizontal, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-// Dynamically import to avoid SSR issues if this were a Next.js app, 
-// but also good for heavy viz libraries
 import ForceGraph2D from 'react-force-graph-2d';
 
 export default function GraphView() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const graphData = useMemo(() => generateGraphData(mockNotes), []);
+  
+  const graphData = useMemo(() => generateGraphData(mockTweets, mockAuthorHubs), []);
 
   useEffect(() => {
-    // Update dimensions on mount and resize
     const updateDimensions = () => {
       const container = document.getElementById('graph-container');
       if (container) {
@@ -29,19 +25,12 @@ export default function GraphView() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Simple color mapping for groups (folders)
-  const groupColors: Record<string, string> = {
-    'Engineering': '#7C3AED', // Primary
-    'Web': '#6366F1',         // Secondary
-    'Management': '#8B5CF6'   // Accent
-  };
-
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-border flex items-center justify-between bg-card z-10">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Knowledge Graph</h1>
-          <p className="text-sm text-muted-foreground">Visualize connections between your notes.</p>
+          <h1 className="text-xl font-bold tracking-tight">Obsidian Graph</h1>
+          <p className="text-sm text-muted-foreground">Mirroring your local vault connections.</p>
         </div>
         
         <div className="flex gap-2">
@@ -68,14 +57,16 @@ export default function GraphView() {
 
         {/* Legend overlay */}
         <div className="absolute top-6 left-6 z-10 bg-card/80 backdrop-blur-md p-4 rounded-lg border border-border shadow-xl min-w-[200px]">
-          <h3 className="text-sm font-semibold mb-3">Categories</h3>
+          <h3 className="text-sm font-semibold mb-3">Nodes</h3>
           <div className="space-y-2">
-            {Object.entries(groupColors).map(([group, color]) => (
-              <div key={group} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                <span>{group}</span>
-              </div>
-            ))}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="w-3 h-3 rounded-full bg-[#7C3AED]" />
+              <span>Author Hubs</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="w-3 h-3 rounded-full bg-[#A78BFA]" />
+              <span>Tweet Notes</span>
+            </div>
           </div>
         </div>
 
@@ -85,42 +76,40 @@ export default function GraphView() {
             height={dimensions.height}
             graphData={graphData}
             nodeLabel="name"
-            nodeColor={(node: any) => groupColors[node.group] || '#4B5563'}
+            nodeColor={(node: any) => node.color}
             linkColor={() => '#333333'}
             linkWidth={1.5}
             nodeRelSize={6}
             backgroundColor="#0a0a0a"
-            onNodeClick={(node) => {
-              // Center view on node click
-              console.log('Clicked node', node);
-            }}
             nodeCanvasObject={(node: any, ctx, globalScale) => {
               const label = node.name;
               const fontSize = 12 / globalScale;
               ctx.font = `${fontSize}px Inter, sans-serif`;
-              const textWidth = ctx.measureText(label).width;
-              const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); 
-
-              ctx.fillStyle = 'rgba(10, 10, 10, 0.8)';
-              ctx.fillRect(
-                node.x - bckgDimensions[0] / 2, 
-                node.y - bckgDimensions[1] / 2, 
-                bckgDimensions[0], 
-                bckgDimensions[1]
-              );
-
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillStyle = groupColors[node.group] || '#9CA3AF';
               
-              // Draw node circle
+              const isHub = node.group === 'Author';
+              
+              // Draw node
               ctx.beginPath();
               ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
+              ctx.fillStyle = node.color;
               ctx.fill();
 
-              // Draw text if zoomed in enough
-              if (globalScale > 1.5) {
-                ctx.fillStyle = '#E5E5E5';
+              // Draw text if zoomed in enough or if it's a major hub
+              if (globalScale > 2 || (isHub && globalScale > 0.8)) {
+                const textWidth = ctx.measureText(label).width;
+                const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); 
+
+                ctx.fillStyle = 'rgba(10, 10, 10, 0.8)';
+                ctx.fillRect(
+                  node.x - bckgDimensions[0] / 2, 
+                  node.y + node.val + fontSize/2, 
+                  bckgDimensions[0], 
+                  bckgDimensions[1]
+                );
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = isHub ? '#FFFFFF' : '#E5E5E5';
                 ctx.fillText(label, node.x, node.y + node.val + fontSize);
               }
             }}

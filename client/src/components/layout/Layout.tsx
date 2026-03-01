@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Database, Network, Twitter, Search, Menu } from "lucide-react";
+import { LayoutDashboard, BookmarkCheck, Network, Settings, Twitter, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface LayoutProps {
@@ -16,45 +16,51 @@ export default function Layout({ children }: LayoutProps) {
       <aside className="w-64 border-r border-border bg-card flex flex-col hidden md:flex">
         <div className="p-4 border-b border-border flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-primary">
-            <Network size={20} />
+            <Twitter size={20} />
           </div>
-          <h1 className="font-semibold tracking-tight">Second Brain</h1>
+          <h1 className="font-semibold tracking-tight">SecondBrain</h1>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4 px-2">Views</div>
+        <nav className="flex-1 p-4 space-y-1">
+          <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-3">Views</div>
           
           <Link href="/">
-            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-              <Database size={18} />
-              <span className="font-medium">Database</span>
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <LayoutDashboard size={18} />
+              <span className="text-sm">Dashboard</span>
+            </div>
+          </Link>
+          
+          <Link href="/bookmarks">
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/bookmarks" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <BookmarkCheck size={18} />
+              <span className="text-sm">Bookmarks</span>
             </div>
           </Link>
           
           <Link href="/graph">
-            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/graph" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/graph" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
               <Network size={18} />
-              <span className="font-medium">Graph View</span>
+              <span className="text-sm">Obsidian Graph</span>
             </div>
           </Link>
 
-          <div className="mt-8 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4 px-2">Integrations</div>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer transition-colors">
-            <Twitter size={18} />
-            <span className="font-medium">Import Tweets</span>
-          </div>
+          <div className="mt-8 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-3">System</div>
+          
+          <Link href="/settings">
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/settings" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <Settings size={18} />
+              <span className="text-sm">Settings</span>
+            </div>
+          </Link>
         </nav>
         
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-              <span className="text-sm font-medium">U</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">User Account</span>
-              <span className="text-xs text-muted-foreground">Pro Plan</span>
-            </div>
+        <div className="p-4 border-t border-border bg-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Sync Status</span>
+            <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
           </div>
+          <p className="text-[11px] text-muted-foreground">Last sync: 2 mins ago</p>
         </div>
       </aside>
 
@@ -63,8 +69,8 @@ export default function Layout({ children }: LayoutProps) {
         {/* Mobile Header */}
         <header className="md:hidden h-14 border-b border-border bg-card flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Network size={20} className="text-primary" />
-            <span className="font-semibold">Second Brain</span>
+            <Twitter size={20} className="text-primary" />
+            <span className="font-semibold">SecondBrain</span>
           </div>
           <Button variant="ghost" size="icon">
             <Menu size={20} />

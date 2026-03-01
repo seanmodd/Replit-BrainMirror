@@ -1,0 +1,132 @@
+I have the following PRD for an App. Let’s start building this, ask me for clarifications whenever you need and don’t make any assumptions.
+
+# Product Requirements Document (PRD) – SecondBrain MVP (Personal Use Edition)
+
+**App Name:** SecondBrain  
+**Version:** 1.0 (Personal MVP)  
+**Target Users:** Primarily you (@persiansean), a knowledge worker / founder who bookmarks tweets heavily on X/Twitter and wants them automatically transformed into a structured, graph-connected second brain in your local Obsidian vault — no focus on general new-user onboarding or broad market features.
+
+**One-Line Summary:** A personal desktop tool that syncs your X/Twitter bookmarks into atomic, interlinked Markdown notes in your Obsidian vault with perfect graph parity, clean schema, and zero manual effort — built first and foremost for your own daily use.
+
+### User Story
+As Sean (@persiansean), who frequently bookmarks insightful threads on X for idea capture and long-term reference,  
+I want my bookmarks to flow automatically into well-organized Obsidian notes with metadata, internal wiki-links, thread connections, author hubs, and a dashboard,  
+So that my Obsidian graph becomes a rich, live visualization of Twitter-sourced knowledge without any bookmark clutter or manual organization — tailored exactly to how I think and work.
+
+### Summary
+SecondBrain is a lightweight, local-first desktop application designed exclusively for your personal workflow. It:
+- Uses your OAuth credentials to access your bookmarks.
+- Polls periodically for new bookmarks (aiming for near real-time feel; fallback since X API lacks bookmark-specific webhooks in 2026).
+- Processes bookmarked threads into per-tweet Markdown files in your vault.
+- Writes directly to your local Obsidian vault with an opinionated, graph-optimized schema.
+- Auto-generates helper notes (author hubs, dashboard) to enhance discoverability.
+- Includes a simple UI for monitoring syncs and viewing a mirrored graph.
+
+Prioritization: Everything is optimized for your solo use — minimal setup (one-time vault selection + auth), no polished onboarding sequences for strangers, no multi-user support, no marketing fluff. Focus on reliability, clean vault output, and exact Obsidian graph replication so you get maximum value immediately.
+
+### Core User Flow (Your Personal Flow)
+1. **Initial Setup (one-time, quick & dirty for you)**  
+   - Launch app → OAuth to your X account (reuse your Premium+ creds if possible).  
+   - Point to your existing Obsidian vault folder path (hardcode or remember it after first run).  
+   - App creates `Twitter/` folder if missing, generates dashboard, and runs initial sync of your recent bookmarks.  
+   - No fancy wizards/tutorials — assume you know what you're doing.
+
+2. **Ongoing Sync (background, set-it-and-forget-it)**  
+   - App lives in tray/background on your machine.  
+   - Polls your bookmarks every 10 minutes (configurable; respect 2026 API limits like ~180 requests/15min per user for bookmarks endpoint).  
+   - Detects new bookmarks → fetches thread context → creates notes if not already processed.  
+   - Skips duplicates entirely.
+
+3. **Your Obsidian Experience**  
+   - Open your vault → new notes appear in `Twitter/`.  
+   - Graph view auto-populates with connected nodes (threads, mentions, hashtags, authors).  
+   - Use backlinks, search, or dashboard for navigation — exactly as you prefer.
+
+4. **App UI (simple monitoring for you)**  
+   - Open window when needed: see sync status, recent processed items, error logs.  
+   - Interactive graph mirroring your vault's Twitter subgraph.  
+   - "Sync Now" button for manual trigger.
+
+### Functional Requirements
+
+1. **Authentication & Access**  
+   - OAuth for your X account (bookmarks read scope).  
+   - Securely store tokens locally (your machine only).  
+   - One-time vault path selection (persist in config file).
+
+2. **Sync Engine**  
+   - Configurable polling (default 10 min; balance against API rate limits — e.g., avoid >180 calls/15min window).  
+   - Track last sync point (e.g., max tweet ID/timestamp from previous pull).  
+   - Fetch full thread for each new bookmark via conversation_id.  
+   - Deduplicate: skip thread if matching tweet_id or conversation_id note exists.
+
+3. **Note Creation**  
+   - One Markdown file per tweet in thread.  
+   - Filename: `Twitter - @handle - First40CharsOrID (YYYY-MM-DD).md` (sanitized, truncated).  
+   - YAML frontmatter:  
+     ```
+     ---
+     tweet_url: https://x.com/...
+     author_handle: @username
+     created_at: ISO8601
+     thread_position: 3/7
+     conversation_id: 1234567890
+     tweet_id: 9876543210987654321
+     tags: [twitter-bookmark, twitter-thread, #startups, #ai, author-@username]
+     quoted_tweet_id: (if any)
+     in_reply_to_tweet_id: (if any)
+     ---
+     ```
+   - Body: Clean tweet text + auto wiki-links (@username → [[@username]], #hashtag → [[#hashtag]], thread/quote links to processed notes).  
+   - Thread nav: “Prev: [[...]]” / “Next: [[...]]”.
+
+4. **Helper Notes (auto-managed for your graph)**  
+   - Author hubs: e.g., `Twitter - @naval.md` — created/updated with backlink list of your processed tweets from them.  
+   - Dashboard: `Twitter Dashboard.md` — updated on sync with recent items, author stats, tag overview (Dataview-friendly).
+
+5. **Folder Structure**  
+   - Flat in `{{vault_root}}/Twitter/` (optimized per Obsidian best practices: source-specific folder + links/tags for organization; avoids deep nesting).  
+   - Helpers in same folder (or root — your choice via config).
+
+6. **Web Viewer (your personal dashboard)**  
+   - List view: filter/sort your processed bookmarks.  
+   - Graph view: replicates Obsidian exactly for Twitter notes (nodes/edges from links).
+
+### Expected Behavior
+
+- Bookmark a thread on X → appears in vault within polling window.  
+- Graph updates organically in Obsidian (refresh if needed).  
+- No duplicates, no overwrites.  
+- Notes portable/clean even if app stops.  
+- Handles your high bookmark volume gracefully (API-aware throttling).
+
+### Design/UI Components
+
+**App (Minimal for You)**  
+- Tray: sync indicator (green/ok, yellow/syncing, red/error).  
+- Window: Status tab (last sync, count), Bookmarks table, Graph tab, Settings (poll interval, vault path).  
+- No splash screens or guided tours.
+
+**Obsidian Side (Auto-Generated)**  
+- Notes: Readable Markdown + YAML.  
+- Hubs/Dashboard: Simple, embed-friendly for quick scans.
+
+### Acceptance Criteria (Your Personal Bar)
+
+- Setup takes <5 min on your machine.  
+- Syncs your bookmarks reliably without hitting API caps unnecessarily.  
+- Creates expected notes/links/hubs with no manual fixes needed.  
+- Graph in app matches your Obsidian Twitter view.  
+- No vault corruption or lost data ever.  
+- Runs stably in background on your Mac/Windows setup.
+
+### Success Metrics (For You)
+
+- You bookmark → notes appear consistently without intervention.  
+- Graph feels dense/useful for idea recall.  
+- Zero frustration from duplicates, clutter, or sync failures.  
+- You keep using it daily because it saves time and boosts thinking.
+
+This version sharpens the PRD for personal use: stripped onboarding fluff, emphasized your solo workflow, kept the core value intact. If anything needs tweaking (e.g., poll default, filename tweak, or add a config flag), just say! Ready for implementation specs or prototypes next?
+
+
