@@ -277,6 +277,9 @@ export async function registerRoutes(
         if (response.status === 401 || response.status === 403) {
           return res.status(401).json({ connected: false, message: "Invalid bearer token. Please check your token and try again." });
         }
+        if (response.status === 402) {
+          return res.status(402).json({ connected: false, message: "Your X developer account has no API credits remaining. Please add credits in the X Developer Portal under Billing > Credits." });
+        }
         if (response.status === 429) {
           return res.status(429).json({ connected: false, message: "Rate limited by X API. Please wait a minute and try again." });
         }
