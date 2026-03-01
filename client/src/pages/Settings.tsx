@@ -235,6 +235,7 @@ export default function Settings() {
 function XAccountCard() {
   const { toast } = useToast();
   const [tokenInput, setTokenInput] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [showConnectForm, setShowConnectForm] = useState(false);
 
@@ -250,6 +251,8 @@ function XAccountCard() {
         toast({ title: "X account verified!", description: `Connected as @${data.user.username}` });
         setShowConnectForm(false);
         setTokenInput("");
+        setUsernameInput("");
+        queryClient.invalidateQueries({ queryKey: ["/api/x-account/status"] });
       }
     },
     onError: (err: any) => {
@@ -259,8 +262,8 @@ function XAccountCard() {
 
   const handleVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tokenInput.trim()) return;
-    verifyMutation.mutate(tokenInput.trim());
+    if (!tokenInput.trim() || !usernameInput.trim()) return;
+    verifyMutation.mutate({ bearerToken: tokenInput.trim(), username: usernameInput.trim() });
   };
 
   return (
@@ -340,6 +343,19 @@ function XAccountCard() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="x-username">X Username</Label>
+                  <Input 
+                    data-testid="input-x-username"
+                    id="x-username"
+                    type="text"
+                    placeholder="@persiansean"
+                    value={usernameInput}
+                    onChange={e => setUsernameInput(e.target.value)}
+                    className="font-mono text-sm bg-muted/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="bearer-token">Bearer Token</Label>
                   <div className="relative">
                     <Input 
@@ -365,7 +381,7 @@ function XAccountCard() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button data-testid="button-verify-token" type="submit" disabled={verifyMutation.isPending || !tokenInput.trim()}>
+                  <Button data-testid="button-verify-token" type="submit" disabled={verifyMutation.isPending || !tokenInput.trim() || !usernameInput.trim()}>
                     {verifyMutation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -373,7 +389,7 @@ function XAccountCard() {
                       </>
                     ) : "Verify & Connect"}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => { setShowConnectForm(false); setTokenInput(""); }}>
+                  <Button type="button" variant="ghost" onClick={() => { setShowConnectForm(false); setTokenInput(""); setUsernameInput(""); }}>
                     Cancel
                   </Button>
                 </div>

@@ -209,22 +209,38 @@ export async function registerRoutes(
 
   // ─── X Account ──────────────────────────────────────────
 
+  async function fetchXUserByUsername(token: string, username: string) {
+    const cleanUsername = username.replace(/^@/, "").trim();
+    const response = await fetch(
+      `https://api.x.com/2/users/by/username/${encodeURIComponent(cleanUsername)}?user.fields=profile_image_url,description,public_metrics`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response;
+  }
+
   app.get("/api/x-account/status", async (_req, res) => {
     try {
       const token = process.env.X_BEARER_TOKEN;
+      const username = process.env.X_USERNAME;
       if (!token) {
         return res.json({ connected: false, message: "No bearer token configured" });
       }
-      const response = await fetch("https://api.x.com/2/users/me?user.fields=profile_image_url,description,public_metrics", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (!username) {
+        return res.json({ connected: false, message: "No X username configured" });
+      }
+      const response = await fetchXUserByUsername(token, username);
       if (!response.ok) {
+        const errBody = await response.text();
+        console.error(`X API status check failed (${response.status}):`, errBody);
         if (response.status === 401 || response.status === 403) {
           return res.json({ connected: false, message: "Bearer token is invalid or expired. Please reconnect." });
         }
         return res.json({ connected: false, message: "Could not reach X API. Please try again later." });
       }
       const data = await response.json();
+      if (!data.data) {
+        return res.json({ connected: false, message: `User @${username} not found on X.` });
+      }
       res.json({
         connected: true,
         user: {
@@ -239,26 +255,39 @@ export async function registerRoutes(
         },
       });
     } catch (err: any) {
+      console.error("X API status error:", err);
       res.json({ connected: false, message: "Could not connect to X API." });
     }
   });
 
   app.post("/api/x-account/verify", async (req, res) => {
     try {
-      const { bearerToken } = req.body;
+      const { bearerToken, username } = req.body;
       if (!bearerToken || typeof bearerToken !== "string") {
         return res.status(400).json({ connected: false, message: "Bearer token is required." });
       }
-      const response = await fetch("https://api.x.com/2/users/me?user.fields=profile_image_url,description,public_metrics", {
-        headers: { Authorization: `Bearer ${bearerToken.trim()}` },
-      });
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ connected: false, message: "X username is required." });
+      }
+      const cleanUsername = username.replace(/^@/, "").trim();
+      const response = await fetchXUserByUsername(bearerToken.trim(), cleanUsername);
       if (!response.ok) {
+        const errBody = await response.text();
+        console.error(`X API verify failed (${response.status}):`, errBody);
         if (response.status === 401 || response.status === 403) {
           return res.status(401).json({ connected: false, message: "Invalid bearer token. Please check your token and try again." });
         }
-        return res.status(502).json({ connected: false, message: "Could not reach X API. Please try again later." });
+        if (response.status === 429) {
+          return res.status(429).json({ connected: false, message: "Rate limited by X API. Please wait a minute and try again." });
+        }
+        return res.status(502).json({ connected: false, message: `X API returned status ${response.status}. Please try again later.` });
       }
       const data = await response.json();
+      if (!data.data) {
+        return res.status(404).json({ connected: false, message: `User @${cleanUsername} not found on X. Please check the username.` });
+      }
+      process.env.X_BEARER_TOKEN = bearerToken.trim();
+      process.env.X_USERNAME = cleanUsername;
       res.json({
         connected: true,
         user: {
@@ -273,6 +302,7 @@ export async function registerRoutes(
         },
       });
     } catch (err: any) {
+      console.error("X API verify error:", err);
       res.status(500).json({ connected: false, message: "Could not connect to X API." });
     }
   });

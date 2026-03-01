@@ -41,7 +41,7 @@ export const api = {
   },
   xAccount: {
     status: () => fetchJSON<any>("/x-account/status"),
-    verify: (bearerToken: string) => fetchJSON<any>("/x-account/verify", { method: "POST", body: JSON.stringify({ bearerToken }) }),
+    verify: (data: { bearerToken: string; username: string }) => fetchJSON<any>("/x-account/verify", { method: "POST", body: JSON.stringify(data) }),
   },
   exportNote: (id: string) => `${API_BASE}/export/${id}`,
   exportAll: () => fetchJSON<any[]>("/export"),
