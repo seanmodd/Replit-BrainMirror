@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
-import { mockTweets, mockAuthorHubs, generateGraphData } from '@/lib/mock-data';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { SlidersHorizontal, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ForceGraph2D from 'react-force-graph-2d';
@@ -7,7 +8,10 @@ import ForceGraph2D from 'react-force-graph-2d';
 export default function GraphView() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   
-  const graphData = useMemo(() => generateGraphData(mockTweets, mockAuthorHubs), []);
+  const { data: graphData, isLoading } = useQuery({
+    queryKey: ["/api/graph"],
+    queryFn: api.graph,
+  });
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -29,20 +33,12 @@ export default function GraphView() {
     <div className="h-full flex flex-col">
       <div className="p-4 border-b border-border flex items-center justify-between bg-card z-10">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Obsidian Graph</h1>
+          <h1 data-testid="text-graph-title" className="text-xl font-bold tracking-tight">Obsidian Graph</h1>
           <p className="text-sm text-muted-foreground">Mirroring your local vault connections.</p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-8 border-border">
-            <SlidersHorizontal size={14} className="mr-2" />
-            Display Options
-          </Button>
         </div>
       </div>
 
       <div className="flex-1 relative bg-[#0a0a0a]" id="graph-container">
-        {/* Controls overlay */}
         <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2 bg-card p-2 rounded-lg border border-border shadow-xl">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
             <ZoomIn size={18} />
@@ -55,7 +51,6 @@ export default function GraphView() {
           </Button>
         </div>
 
-        {/* Legend overlay */}
         <div className="absolute top-6 left-6 z-10 bg-card/80 backdrop-blur-md p-4 rounded-lg border border-border shadow-xl min-w-[200px]">
           <h3 className="text-sm font-semibold mb-3">Nodes</h3>
           <div className="space-y-2">
@@ -68,9 +63,22 @@ export default function GraphView() {
               <span>Tweet Notes</span>
             </div>
           </div>
+          {graphData && (
+            <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+              {graphData.nodes?.length || 0} nodes · {graphData.links?.length || 0} edges
+            </div>
+          )}
         </div>
 
-        {typeof window !== 'undefined' && (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            Loading graph data...
+          </div>
+        ) : (!graphData?.nodes?.length) ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            Import some tweets to see your knowledge graph.
+          </div>
+        ) : (
           <ForceGraph2D
             width={dimensions.width}
             height={dimensions.height}
@@ -88,13 +96,11 @@ export default function GraphView() {
               
               const isHub = node.group === 'Author';
               
-              // Draw node
               ctx.beginPath();
               ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
               ctx.fillStyle = node.color;
               ctx.fill();
 
-              // Draw text if zoomed in enough or if it's a major hub
               if (globalScale > 2 || (isHub && globalScale > 0.8)) {
                 const textWidth = ctx.measureText(label).width;
                 const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); 

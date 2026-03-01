@@ -1,15 +1,72 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
+  const { toast } = useToast();
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["/api/settings"],
+    queryFn: api.settings.get,
+  });
+
+  const [form, setForm] = useState({
+    vaultPath: "",
+    pollInterval: 10,
+    filenameTemplate: "",
+    generateAuthorHubs: true,
+    generateDashboard: true,
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setForm({
+        vaultPath: settings.vaultPath || "",
+        pollInterval: settings.pollInterval || 10,
+        filenameTemplate: settings.filenameTemplate || "",
+        generateAuthorHubs: settings.generateAuthorHubs ?? true,
+        generateDashboard: settings.generateDashboard ?? true,
+      });
+    }
+  }, [settings]);
+
+  const updateMutation = useMutation({
+    mutationFn: api.settings.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Settings saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to save", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate(form);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-full p-6 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full p-6 max-w-4xl mx-auto overflow-y-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-1 text-foreground">Settings</h1>
+        <h1 data-testid="text-settings-title" className="text-3xl font-bold tracking-tight mb-1 text-foreground">Settings</h1>
         <p className="text-muted-foreground">Configure your SecondBrain behavior and Obsidian integration.</p>
       </div>
 
@@ -24,11 +81,12 @@ export default function Settings() {
               <Label htmlFor="vault-path">Local Obsidian Vault Path</Label>
               <div className="flex gap-2">
                 <Input 
+                  data-testid="input-vault-path"
                   id="vault-path" 
-                  defaultValue="~/Documents/Obsidian/SecondBrain/Twitter" 
+                  value={form.vaultPath}
+                  onChange={e => setForm(f => ({ ...f, vaultPath: e.target.value }))}
                   className="font-mono text-sm bg-muted/50" 
                 />
-                <Button variant="secondary">Browse...</Button>
               </div>
               <p className="text-xs text-muted-foreground">Notes will be created directly in this folder.</p>
             </div>
@@ -43,8 +101,8 @@ export default function Settings() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="poll-interval">Polling Interval</Label>
-              <Select defaultValue="10">
-                <SelectTrigger id="poll-interval" className="w-[200px]">
+              <Select value={String(form.pollInterval)} onValueChange={v => setForm(f => ({ ...f, pollInterval: Number(v) }))}>
+                <SelectTrigger data-testid="select-poll-interval" id="poll-interval" className="w-[200px]">
                   <SelectValue placeholder="Select interval" />
                 </SelectTrigger>
                 <SelectContent>
@@ -70,13 +128,11 @@ export default function Settings() {
                     </svg>
                   </div>
                   <div>
-                    <div className="font-medium">@persiansean</div>
-                    <div className="text-xs text-green-500">Connected & Authenticated</div>
+                    <div className="font-medium">Not Connected</div>
+                    <div className="text-xs text-muted-foreground">Add X API credentials to enable auto-sync</div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
-                  Disconnect
-                </Button>
+                <Button variant="outline" size="sm">Connect</Button>
               </div>
             </div>
           </CardContent>
@@ -91,7 +147,9 @@ export default function Settings() {
             <div className="space-y-2">
               <Label>Filename Template</Label>
               <Input 
-                defaultValue="Twitter - {author_handle} - {content_trunc_40} ({date})" 
+                data-testid="input-filename-template"
+                value={form.filenameTemplate}
+                onChange={e => setForm(f => ({ ...f, filenameTemplate: e.target.value }))}
                 className="font-mono text-sm bg-muted/50" 
               />
             </div>
@@ -99,20 +157,33 @@ export default function Settings() {
             <div className="space-y-2 mt-4">
               <Label>Helper Notes</Label>
               <div className="flex items-center space-x-2 mt-2">
-                <input type="checkbox" id="author-hubs" defaultChecked className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
-                <Label htmlFor="author-hubs" className="font-normal text-sm">Automatically generate Author Hubs (`Twitter - @handle.md`)</Label>
+                <input 
+                  type="checkbox" 
+                  id="author-hubs" 
+                  checked={form.generateAuthorHubs}
+                  onChange={e => setForm(f => ({ ...f, generateAuthorHubs: e.target.checked }))}
+                  className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" 
+                />
+                <Label htmlFor="author-hubs" className="font-normal text-sm">Automatically generate Author Hubs</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <input type="checkbox" id="dashboard-note" defaultChecked className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
-                <Label htmlFor="dashboard-note" className="font-normal text-sm">Update `Twitter Dashboard.md` on every sync</Label>
+                <input 
+                  type="checkbox" 
+                  id="dashboard-note" 
+                  checked={form.generateDashboard}
+                  onChange={e => setForm(f => ({ ...f, generateDashboard: e.target.checked }))}
+                  className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" 
+                />
+                <Label htmlFor="dashboard-note" className="font-normal text-sm">Update Twitter Dashboard.md on every sync</Label>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <div className="flex justify-end gap-3 pt-4">
-          <Button variant="ghost">Cancel</Button>
-          <Button>Save Settings</Button>
+          <Button data-testid="button-save-settings" onClick={handleSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? "Saving..." : "Save Settings"}
+          </Button>
         </div>
       </div>
     </div>
