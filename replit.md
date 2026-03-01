@@ -13,7 +13,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 
 - `tweet_notes` — Individual tweet bookmarks with metadata (author, content, tags, thread position, links)
 - `sync_logs` — Track sync operations and their status
-- `settings` — User configuration (vault path, poll interval, filename template, etc.)
+- `settings` — User configuration (poll interval, filename template, etc.)
 
 ## Key Files
 
@@ -38,6 +38,23 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `GET /api/sync-logs` — Recent sync history
 - `GET /api/settings` — Get current settings
 - `PUT /api/settings` — Update settings
+- `GET /api/x-account/status` — Check X account connection status
+- `POST /api/x-account/verify` — Verify bearer token + username (uses App-Only auth via `/2/users/by/username`)
+- `GET /api/export/:id` — Download single note as Markdown
+- `GET /api/export` — Get all notes as JSON
+- `GET /api/export/zip/download` — Download all notes as a ZIP file
+
+## X/Twitter Integration
+
+- Uses App-Only Bearer Token (not OAuth user context)
+- Verification via `/2/users/by/username/:username` endpoint
+- Token + username stored in process.env at runtime
+
+## Obsidian Export
+
+- Notes exported as Obsidian-compatible Markdown with YAML frontmatter
+- Wiki-links for authors (`[[@handle]]`) and hashtags (`[[#tag]]`)
+- ZIP download for bulk export into Obsidian vault (Obsidian Sync handles cloud distribution)
 
 ## Style
 

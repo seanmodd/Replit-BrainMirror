@@ -7,10 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { FolderOpen, Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield } from "lucide-react";
+import { Download, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Shield } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -54,12 +53,11 @@ export default function Settings() {
     updateMutation.mutate(form);
   };
 
-  const handleOpenVaultFolder = () => {
-    const vaultUri = form.vaultPath.startsWith("~")
-      ? form.vaultPath
-      : form.vaultPath;
-    const encoded = encodeURIComponent(vaultUri);
-    window.open(`obsidian://open?path=${encoded}`, "_blank");
+  const handleExportZip = () => {
+    const a = document.createElement("a");
+    a.href = "/api/export/zip/download";
+    a.download = "BrainMirror-Obsidian-Notes.zip";
+    a.click();
   };
 
   const handleExportAll = async () => {
@@ -107,48 +105,35 @@ export default function Settings() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Obsidian Vault</CardTitle>
-            <CardDescription>Your local vault path for reference and one-click open.</CardDescription>
+            <CardTitle>Export to Obsidian</CardTitle>
+            <CardDescription>Download your tweet notes as Obsidian-compatible Markdown files. Drop them into your vault and Obsidian Sync will handle the rest.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="vault-path">Local Obsidian Vault Path</Label>
-              <div className="flex gap-2">
-                <Input 
-                  data-testid="input-vault-path"
-                  id="vault-path" 
-                  value={form.vaultPath}
-                  onChange={e => setForm(f => ({ ...f, vaultPath: e.target.value }))}
-                  className="font-mono text-sm bg-muted/50" 
-                  placeholder="~/Documents/Obsidian/MyVault/Twitter"
-                />
-                <Button 
-                  data-testid="button-open-vault"
-                  variant="secondary" 
-                  onClick={handleOpenVaultFolder}
-                  title="Open in Obsidian"
-                >
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  Open in Obsidian
-                </Button>
+            <div className="flex items-start gap-3 text-sm text-muted-foreground bg-muted/30 p-3 rounded-md">
+              <Download className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground mb-1">How it works</p>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Download your notes as a ZIP file</li>
+                  <li>Unzip into your Obsidian vault folder (e.g. a "Twitter" subfolder)</li>
+                  <li>Obsidian Sync will automatically push the new files to all your devices</li>
+                </ol>
               </div>
-              <p className="text-xs text-muted-foreground">
-                This opens your vault via the <code className="bg-muted px-1 rounded">obsidian://</code> protocol. Make sure Obsidian is installed locally.
-              </p>
             </div>
 
-            <Separator className="bg-border" />
-
-            <div className="space-y-2">
-              <Label>Export Notes to Vault</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Download all notes as Markdown files with proper YAML frontmatter and wiki-links. Place them in your vault's Twitter folder.
-              </p>
+            <div className="flex gap-3">
+              <Button data-testid="button-export-zip" variant="default" onClick={handleExportZip}>
+                <Download className="mr-2 h-4 w-4" />
+                Download All as ZIP
+              </Button>
               <Button data-testid="button-export-all" variant="outline" onClick={handleExportAll}>
                 <Download className="mr-2 h-4 w-4" />
-                Download All Notes as Markdown
+                Download Individual Files
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Notes include YAML frontmatter, wiki-links to authors (<code className="bg-muted px-1 rounded">[[@handle]]</code>), and hashtag links (<code className="bg-muted px-1 rounded">[[#tag]]</code>) for Obsidian's graph view.
+            </p>
           </CardContent>
         </Card>
 

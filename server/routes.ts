@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
 
@@ -332,6 +333,34 @@ export async function registerRoutes(
       const s = await storage.getSettings();
       const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
       res.json(files);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/export/zip/download", async (_req, res) => {
+    try {
+      const tweets = await storage.getAllTweetNotes();
+      if (tweets.length === 0) {
+        return res.status(404).json({ message: "No notes to export" });
+      }
+      const s = await storage.getSettings();
+      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", 'attachment; filename="BrainMirror-Obsidian-Notes.zip"');
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.on("error", (err: Error) => {
+        res.status(500).json({ message: err.message });
+      });
+      archive.pipe(res);
+
+      for (const file of files) {
+        archive.append(file.content, { name: file.filename });
+      }
+
+      await archive.finalize();
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
