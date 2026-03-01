@@ -4,7 +4,7 @@ import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
 import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
-import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets, fetchUserLikes } from "./xauth";
+import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets } from "./xauth";
 
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const date = new Date(tweet.createdAt).toISOString().split("T")[0];
@@ -359,7 +359,7 @@ export async function registerRoutes(
       }
 
       const { types } = req.body;
-      const syncTypes: string[] = Array.isArray(types) ? types : ["tweets", "likes"];
+      const syncTypes: string[] = Array.isArray(types) ? types : ["tweets"];
 
       const userLookup = await fetch(
         `https://api.x.com/2/users/by/username/${encodeURIComponent(username)}?user.fields=id`,
@@ -429,14 +429,6 @@ export async function registerRoutes(
 
         if (syncTypes.includes("tweets")) {
           const { tweets, authors } = await fetchUserTweets(bearerToken, userId);
-          const result = await importTweets(tweets, authors);
-          totalImported += result.imported;
-          totalSkipped += result.skipped;
-          totalFetched += tweets.length;
-        }
-
-        if (syncTypes.includes("likes")) {
-          const { tweets, authors } = await fetchUserLikes(bearerToken, userId);
           const result = await importTweets(tweets, authors);
           totalImported += result.imported;
           totalSkipped += result.skipped;

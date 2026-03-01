@@ -216,7 +216,6 @@ function XAccountCard() {
   const [showToken, setShowToken] = useState(false);
   const [showConnectForm, setShowConnectForm] = useState(false);
   const [syncTweets, setSyncTweets] = useState(true);
-  const [syncLikes, setSyncLikes] = useState(true);
 
   const { data: xStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["/api/x-account/status"],
@@ -243,7 +242,6 @@ function XAccountCard() {
     mutationFn: () => {
       const types: string[] = [];
       if (syncTweets) types.push("tweets");
-      if (syncLikes) types.push("likes");
       return api.sync.public(types);
     },
     onSuccess: (data) => {
@@ -272,7 +270,7 @@ function XAccountCard() {
           <XIcon />
           X Account — Public Sync
         </CardTitle>
-        <CardDescription>Connect with a Bearer Token to sync your public tweets, retweets, and likes. No OAuth needed.</CardDescription>
+        <CardDescription>Connect with a Bearer Token to sync your public tweets and retweets. No OAuth needed.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {statusLoading ? (
@@ -317,10 +315,6 @@ function XAccountCard() {
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={syncTweets} onChange={e => setSyncTweets(e.target.checked)} className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
                   Tweets & Retweets
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={syncLikes} onChange={e => setSyncLikes(e.target.checked)} className="rounded border-border bg-card text-primary focus:ring-primary h-4 w-4" />
-                  Liked Tweets
                 </label>
               </div>
               <Button

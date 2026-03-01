@@ -52,7 +52,7 @@ export const api = {
     authorize: () => fetchJSON<any>("/x-auth/authorize"),
   },
   sync: {
-    public: (types?: string[]) => fetchJSON<any>("/sync/public", { method: "POST", body: JSON.stringify({ types: types || ["tweets", "likes"] }) }),
+    public: (types?: string[]) => fetchJSON<any>("/sync/public", { method: "POST", body: JSON.stringify({ types: types || ["tweets"] }) }),
     bookmarks: () => fetchJSON<any>("/sync/bookmarks", { method: "POST" }),
   },
   exportNote: (id: string) => `${API_BASE}/export/${id}`,

@@ -28,7 +28,7 @@ export default function Dashboard() {
   };
 
   const publicSyncMutation = useMutation({
-    mutationFn: () => api.sync.public(["tweets", "likes"]),
+    mutationFn: () => api.sync.public(["tweets"]),
     onSuccess: (data) => {
       invalidateAfterSync();
       toast({
