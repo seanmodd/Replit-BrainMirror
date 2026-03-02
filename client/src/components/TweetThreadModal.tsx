@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2, Play } from "lucide-react";
-import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
 
 interface TweetThreadModalProps {
   tweet: any;
@@ -10,20 +10,14 @@ interface TweetThreadModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function isVideoUrl(url: string): boolean {
-  const lower = url.toLowerCase();
-  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") ||
-    lower.includes("/video/") || lower.includes("video.twimg.com") ||
-    lower.includes("/ext_tw_video/") || lower.includes("/amplify_video/");
-}
-
-function MediaItem({ url, tweetId, index, single }: { url: string; tweetId: string; index: number; single: boolean }) {
+function MediaItemComponent({ url, tweetId, index, single }: { url: string; tweetId: string; index: number; single: boolean }) {
+  const proxiedUrl = proxyImageUrl(url);
   if (isVideoUrl(url)) {
     return (
       <div className={`relative ${single ? "max-h-[400px]" : "h-[180px]"} bg-black`}>
         <video
           data-testid={`modal-video-media-${tweetId}-${index}`}
-          src={url}
+          src={proxiedUrl}
           controls
           playsInline
           preload="metadata"
@@ -37,7 +31,7 @@ function MediaItem({ url, tweetId, index, single }: { url: string; tweetId: stri
     <a href={url} target="_blank" rel="noreferrer" className="block">
       <img
         data-testid={`modal-img-media-${tweetId}-${index}`}
-        src={url}
+        src={proxiedUrl}
         alt=""
         className={`w-full object-cover ${single ? "max-h-[400px]" : "h-[180px]"} hover:opacity-90 transition-opacity`}
         loading="lazy"
@@ -108,10 +102,12 @@ function ThreadTweetItem({
 }) {
   const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+  const autoTags = getAutoTags(tweet);
 
   const contentLinks = (tweet.links || []).filter((u: string) => u && u !== "" && u !== "undefined");
-  const videoLinks = contentLinks.filter((u: string) => isVideoUrl(u));
+  const videoLinks = contentLinks.filter((u: string) => isVideoUrl(u) && !u.includes("x.com/") && !u.includes("twitter.com/"));
   const allMedia = [...mediaUrls, ...videoLinks.filter((v: string) => !mediaUrls.includes(v))];
+  const profileSrc = tweet.authorProfileImageUrl ? proxyImageUrl(tweet.authorProfileImageUrl) : null;
 
   const hasStoredQuote = tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle;
   const fallbackQuote = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
@@ -137,16 +133,16 @@ function ThreadTweetItem({
 
       <div className="flex gap-3">
         <div className="flex flex-col items-center">
-          {tweet.authorProfileImageUrl ? (
+          {profileSrc ? (
             <img
               data-testid={`modal-avatar-img-${tweet.id}`}
-              src={tweet.authorProfileImageUrl}
+              src={profileSrc}
               alt={displayName}
               className={`w-10 h-10 rounded-full object-cover shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""}`}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
             />
           ) : null}
-          <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""} ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
+          <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""} ${profileSrc ? 'hidden' : ''}`}>
             {displayName?.[0]?.toUpperCase() || "?"}
           </div>
           {showConnector && (
@@ -171,7 +167,7 @@ function ThreadTweetItem({
           {allMedia.length > 0 && (
             <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${allMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
               {allMedia.map((url: string, i: number) => (
-                <MediaItem key={i} url={url} tweetId={tweet.id} index={i} single={allMedia.length === 1} />
+                <MediaItemComponent key={i} url={url} tweetId={tweet.id} index={i} single={allMedia.length === 1} />
               ))}
             </div>
           )}
@@ -192,7 +188,7 @@ function ThreadTweetItem({
                 {quoteMediaUrls.length > 0 && (
                   <div className={`mt-2 rounded-xl overflow-hidden border border-border ${quoteMediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
                     {quoteMediaUrls.map((url: string, i: number) => (
-                      <MediaItem key={i} url={url} tweetId={`quote-${tweet.id}`} index={i} single={quoteMediaUrls.length === 1} />
+                      <MediaItemComponent key={i} url={url} tweetId={`quote-${tweet.id}`} index={i} single={quoteMediaUrls.length === 1} />
                     ))}
                   </div>
                 )}
@@ -200,11 +196,11 @@ function ThreadTweetItem({
             </div>
           )}
 
-          {(tweet.tags || []).length > 0 && (
+          {autoTags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {(tweet.tags || []).map((tag: string) => (
+              {autoTags.map((tag: string) => (
                 <span key={tag} className="text-[13px] text-[#1d9bf0]">
-                  {tag.startsWith("#") ? tag : `#${tag}`}
+                  {tag}
                 </span>
               ))}
             </div>

@@ -4,7 +4,26 @@ import archiver from "archiver";
 import { storage } from "./storage";
 import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@shared/schema";
 import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
-import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets } from "./xauth";
+import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets, type MediaItem } from "./xauth";
+
+function getBestMediaUrl(m: MediaItem): string {
+  if (m.type === "photo") {
+    return m.url || m.preview_image_url || "";
+  }
+  if (m.type === "video" || m.type === "animated_gif") {
+    if (m.variants && m.variants.length > 0) {
+      const mp4Variants = m.variants
+        .filter(v => v.content_type === "video/mp4")
+        .sort((a, b) => (b.bit_rate || 0) - (a.bit_rate || 0));
+      if (mp4Variants.length > 0) {
+        return mp4Variants[0].url;
+      }
+      return m.variants[0].url;
+    }
+    return m.preview_image_url || m.url || "";
+  }
+  return m.url || m.preview_image_url || "";
+}
 
 function getRealAuthor(tweet: TweetNote): { handle: string; name: string } {
   const content = tweet.content || "";
@@ -730,7 +749,10 @@ export async function registerRoutes(
             if (tw.attachments?.media_keys) {
               for (const key of tw.attachments.media_keys) {
                 const m = mediaMap.get(key);
-                if (m) mediaUrls.push(m.url || m.preview_image_url || "");
+                if (m) {
+                  const bestUrl = getBestMediaUrl(m);
+                  if (bestUrl) mediaUrls.push(bestUrl);
+                }
               }
             }
             if (quotedId && refTweetsMap.has(quotedId)) {
@@ -738,8 +760,9 @@ export async function registerRoutes(
               if (quotedTw.attachments?.media_keys) {
                 for (const key of quotedTw.attachments.media_keys) {
                   const m = mediaMap.get(key);
-                  if (m && !mediaUrls.includes(m.url || m.preview_image_url || "")) {
-                    mediaUrls.push(m.url || m.preview_image_url || "");
+                  if (m) {
+                    const bestUrl = getBestMediaUrl(m);
+                    if (bestUrl && !mediaUrls.includes(bestUrl)) mediaUrls.push(bestUrl);
                   }
                 }
               }
@@ -881,7 +904,8 @@ export async function registerRoutes(
             for (const key of bm.attachments.media_keys) {
               const m = media.get(key);
               if (m) {
-                mediaUrls.push(m.url || m.preview_image_url || "");
+                const bestUrl = getBestMediaUrl(m);
+                if (bestUrl) mediaUrls.push(bestUrl);
               }
             }
           }
@@ -890,8 +914,9 @@ export async function registerRoutes(
             if (quotedTw.attachments?.media_keys) {
               for (const key of quotedTw.attachments.media_keys) {
                 const m = media.get(key);
-                if (m && !mediaUrls.includes(m.url || m.preview_image_url || "")) {
-                  mediaUrls.push(m.url || m.preview_image_url || "");
+                if (m) {
+                  const bestUrl = getBestMediaUrl(m);
+                  if (bestUrl && !mediaUrls.includes(bestUrl)) mediaUrls.push(bestUrl);
                 }
               }
             }
@@ -982,6 +1007,87 @@ export async function registerRoutes(
       }
     } catch (err: any) {
       console.error("Bookmark sync error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Twitter Media Proxy ────────────────────────────────────
+
+  app.get("/api/proxy/twitter-image", async (req, res) => {
+    try {
+      const { url } = req.query;
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ message: "URL parameter required" });
+      }
+      if (!url.includes("twimg.com") && !url.includes("twitter.com") && !url.includes("x.com")) {
+        return res.status(400).json({ message: "Only Twitter/X media URLs supported" });
+      }
+      const response = await fetch(url);
+      if (!response.ok) {
+        return res.status(response.status).json({ message: "Failed to fetch media" });
+      }
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Enrich Profile Images ────────────────────────────────
+
+  app.post("/api/tweets/enrich-profiles", async (req, res) => {
+    try {
+      const bearerToken = process.env.X_BEARER_TOKEN;
+      if (!bearerToken) {
+        return res.status(401).json({ message: "No bearer token configured" });
+      }
+
+      const allTweets = await storage.getAllTweetNotes();
+      const tweetsNeedingProfiles = allTweets.filter(t => !t.authorProfileImageUrl);
+      const uniqueHandles = new Set<string>();
+      for (const t of tweetsNeedingProfiles) {
+        const real = getRealAuthor(t);
+        uniqueHandles.add(real.handle.toLowerCase());
+      }
+
+      const profileMap = new Map<string, string>();
+      let lookupCount = 0;
+
+      for (const handle of uniqueHandles) {
+        if (lookupCount >= 50) break;
+        try {
+          const resp = await fetch(
+            `https://api.x.com/2/users/by/username/${encodeURIComponent(handle)}?user.fields=profile_image_url`,
+            { headers: { Authorization: `Bearer ${bearerToken}` } }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.data?.profile_image_url) {
+              const bigUrl = data.data.profile_image_url.replace("_normal", "_bigger");
+              profileMap.set(handle, bigUrl);
+            }
+          }
+          lookupCount++;
+        } catch {
+        }
+      }
+
+      let updated = 0;
+      for (const t of tweetsNeedingProfiles) {
+        const real = getRealAuthor(t);
+        const profileUrl = profileMap.get(real.handle.toLowerCase());
+        if (profileUrl) {
+          await storage.updateTweetNote(t.id, { authorProfileImageUrl: profileUrl });
+          updated++;
+        }
+      }
+
+      res.json({ updated, looked_up: lookupCount, total_needing: tweetsNeedingProfiles.length });
+    } catch (err: any) {
+      console.error("Enrich profiles error:", err);
       res.status(500).json({ message: err.message });
     }
   });

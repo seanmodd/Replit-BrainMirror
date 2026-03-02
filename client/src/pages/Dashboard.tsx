@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal, Globe, Pencil, Github, Upload } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal, Globe, Pencil, Github, Upload, UserCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -99,7 +99,21 @@ export default function Dashboard() {
     githubPushMutation.mutate({ owner, repo: repoName, folder: settingsData?.githubFolder || undefined });
   };
 
-  const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending || githubPushMutation.isPending;
+  const enrichProfilesMutation = useMutation({
+    mutationFn: api.tweets.enrichProfiles,
+    onSuccess: (data) => {
+      invalidateAfterSync();
+      toast({
+        title: "Profile images updated",
+        description: `${data.updated} tweets enriched (${data.looked_up} authors checked)`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Profile enrichment failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending || githubPushMutation.isPending || enrichProfilesMutation.isPending;
 
   const recentTweets = tweets?.slice(0, 5) || [];
 
@@ -138,6 +152,20 @@ export default function Dashboard() {
                 <Bookmark className="mr-2 h-4 w-4" />
               )}
               {bookmarkSyncMutation.isPending ? "Syncing..." : "Sync Bookmarks"}
+            </Button>
+            <Button
+              data-testid="button-enrich-profiles"
+              variant="outline"
+              className="w-fit"
+              onClick={() => enrichProfilesMutation.mutate()}
+              disabled={isSyncing}
+            >
+              {enrichProfilesMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <UserCircle className="mr-2 h-4 w-4" />
+              )}
+              {enrichProfilesMutation.isPending ? "Fetching..." : "Fetch Avatars"}
             </Button>
             {ghStatus?.connected && (
               <Button

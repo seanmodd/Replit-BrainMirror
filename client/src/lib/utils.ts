@@ -81,6 +81,38 @@ export function formatContent(content: string): React.ReactNode[] {
   return parts;
 }
 
+export function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") ||
+    lower.includes("/video/") || lower.includes("video.twimg.com") ||
+    lower.includes("/ext_tw_video/") || lower.includes("/amplify_video/");
+}
+
+export function proxyImageUrl(url: string): string {
+  if (!url) return url;
+  if (url.includes("twimg.com")) {
+    return `/api/proxy/twitter-image?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+export function getAutoTags(tweet: any): string[] {
+  const tags = new Set<string>();
+  const existingTags = tweet.tags || [];
+  for (const t of existingTags) {
+    tags.add(t.startsWith("#") ? t : `#${t}`);
+  }
+  const content = tweet.content || "";
+  const isRt = content.startsWith("RT @") || tweet.source === "retweet";
+  if (isRt) {
+    tags.add("#retweet");
+  }
+  if (tweet.source === "bookmark" || (!isRt && tweet.source !== "retweet")) {
+    tags.add("#bookmark");
+  }
+  return Array.from(tags);
+}
+
 export function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleString("en-US", {

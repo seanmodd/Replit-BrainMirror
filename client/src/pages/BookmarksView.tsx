@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
 
 type SourceTab = "all" | "bookmark" | "retweet" | "public" | "manual";
@@ -380,7 +380,7 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
           {tweet.authorProfileImageUrl ? (
             <img
               data-testid={`avatar-img-${tweet.id}`}
-              src={tweet.authorProfileImageUrl}
+              src={proxyImageUrl(tweet.authorProfileImageUrl)}
               alt={displayName}
               className="w-10 h-10 rounded-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
@@ -429,16 +429,30 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
 
           {mediaUrls.length > 0 && (
             <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
-              {mediaUrls.map((url: string, i: number) => (
-                <img
-                  key={i}
-                  data-testid={`img-media-${tweet.id}-${i}`}
-                  src={url}
-                  alt=""
-                  className={`w-full object-cover ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
-                  loading="lazy"
-                />
-              ))}
+              {mediaUrls.map((url: string, i: number) =>
+                isVideoUrl(url) ? (
+                  <div key={i} className={`relative bg-black ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}>
+                    <video
+                      data-testid={`video-media-${tweet.id}-${i}`}
+                      src={proxyImageUrl(url)}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className={`w-full object-contain ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                ) : (
+                  <img
+                    key={i}
+                    data-testid={`img-media-${tweet.id}-${i}`}
+                    src={proxyImageUrl(url)}
+                    alt=""
+                    className={`w-full object-cover ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
+                    loading="lazy"
+                  />
+                )
+              )}
             </div>
           )}
 
@@ -465,15 +479,18 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
             </div>
           )}
 
-          {(tweet.tags || []).length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {(tweet.tags || []).map((tag: string) => (
-                <span key={tag} className="text-[13px] text-[#1d9bf0] hover:underline cursor-pointer">
-                  {tag.startsWith("#") ? tag : `#${tag}`}
-                </span>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const autoTags = getAutoTags(tweet);
+            return autoTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {autoTags.map((tag: string) => (
+                  <span key={tag} className="text-[13px] text-[#1d9bf0] hover:underline cursor-pointer">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null;
+          })()}
 
           <div className="flex items-center justify-between mt-3 max-w-[425px] -ml-2">
             <button className="flex items-center gap-1 group/action p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors">

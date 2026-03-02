@@ -184,11 +184,18 @@ export interface BookmarkAuthor {
   profile_image_url?: string;
 }
 
+export interface MediaVariant {
+  bit_rate?: number;
+  content_type: string;
+  url: string;
+}
+
 export interface MediaItem {
   media_key: string;
   type: string;
   url?: string;
   preview_image_url?: string;
+  variants?: MediaVariant[];
 }
 
 export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any>; media: Map<string, MediaItem> }> {
@@ -199,7 +206,7 @@ export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; autho
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
     "user.fields": "name,username,profile_image_url",
-    "media.fields": "url,preview_image_url,type",
+    "media.fields": "url,preview_image_url,type,variants",
     expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
   });
@@ -259,7 +266,7 @@ export async function fetchUserTweets(bearerToken: string, userId: string): Prom
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
     "user.fields": "name,username,profile_image_url",
-    "media.fields": "url,preview_image_url,type",
+    "media.fields": "url,preview_image_url,type,variants",
     expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
   });

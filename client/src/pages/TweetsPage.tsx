@@ -8,7 +8,7 @@ import { Twitter, ExternalLink, Bookmark, Repeat2, Globe, Pencil, MessageCircle,
 import { Link, useSearch } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import TweetThreadModal from "@/components/TweetThreadModal";
 
@@ -104,6 +104,8 @@ export default function TweetsPage() {
               {tweets!.map((tweet: any) => {
                 const info = getDisplayInfo(tweet);
                 const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+                const autoTags = getAutoTags(tweet);
+                const profileSrc = tweet.authorProfileImageUrl ? proxyImageUrl(tweet.authorProfileImageUrl) : null;
                 return (
                   <article key={tweet.id} data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onDoubleClick={() => setThreadTweet(tweet)}>
                     {info.isRetweet && (
@@ -113,16 +115,16 @@ export default function TweetsPage() {
                       </div>
                     )}
                     <div className="flex gap-3">
-                      {tweet.authorProfileImageUrl ? (
+                      {profileSrc ? (
                         <img
                           data-testid={`avatar-img-${tweet.id}`}
-                          src={tweet.authorProfileImageUrl}
+                          src={profileSrc}
                           alt={info.displayName}
                           className="w-8 h-8 rounded-full object-cover shrink-0"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
                         />
                       ) : null}
-                      <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${profileSrc ? 'hidden' : ''}`}>
                         {info.displayName?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -139,8 +141,30 @@ export default function TweetsPage() {
                         <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
                         {mediaUrls.length > 0 && (
                           <div className={`mt-2 rounded-xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
-                            {mediaUrls.slice(0, 4).map((url: string, i: number) => (
-                              <img key={i} src={url} alt="" className="w-full object-cover h-[140px]" loading="lazy" />
+                            {mediaUrls.slice(0, 4).map((url: string, i: number) =>
+                              isVideoUrl(url) ? (
+                                <div key={i} className="relative bg-black h-[140px]">
+                                  <video
+                                    data-testid={`video-media-${tweet.id}-${i}`}
+                                    src={proxyImageUrl(url)}
+                                    controls
+                                    playsInline
+                                    preload="metadata"
+                                    className="w-full object-contain h-[140px]"
+                                  />
+                                </div>
+                              ) : (
+                                <img key={i} src={proxyImageUrl(url)} alt="" className="w-full object-cover h-[140px]" loading="lazy" />
+                              )
+                            )}
+                          </div>
+                        )}
+                        {autoTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {autoTags.map((tag: string) => (
+                              <span key={tag} className="text-[12px] text-[#1d9bf0]">
+                                {tag}
+                              </span>
                             ))}
                           </div>
                         )}

@@ -6,15 +6,8 @@ import { ArrowLeft, CalendarDays, Twitter, ExternalLink, Bookmark, Repeat2, Glob
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo, useState } from "react";
-import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
-
-function isVideoUrl(url: string): boolean {
-  const lower = url.toLowerCase();
-  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") ||
-    lower.includes("/video/") || lower.includes("video.twimg.com") ||
-    lower.includes("/ext_tw_video/") || lower.includes("/amplify_video/");
-}
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -203,23 +196,24 @@ export default function TimelinePage() {
                         <div className="divide-y divide-border">
                           {dayTweets.map((tweet: any) => {
                             const info = getDisplayInfo(tweet);
-                            const autoTags = extractAutoTags(tweet);
+                            const autoTags = getAutoTags(tweet);
                             const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
-                            const videoLinks = (tweet.links || []).filter((u: string) => u && u !== "" && isVideoUrl(u));
+                            const videoLinks = (tweet.links || []).filter((u: string) => u && u !== "" && isVideoUrl(u) && !u.includes("x.com/") && !u.includes("twitter.com/"));
                             const allMedia = [...mediaUrls, ...videoLinks.filter((v: string) => !mediaUrls.includes(v))];
+                            const profileSrc = tweet.authorProfileImageUrl ? proxyImageUrl(tweet.authorProfileImageUrl) : null;
                             return (
                               <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onClick={() => setThreadTweet(tweet)}>
                                 <div className="flex gap-3">
-                                  {tweet.authorProfileImageUrl ? (
+                                  {profileSrc ? (
                                     <img
                                       data-testid={`avatar-img-${tweet.id}`}
-                                      src={tweet.authorProfileImageUrl}
+                                      src={profileSrc}
                                       alt={info.displayName}
                                       className="w-8 h-8 rounded-full object-cover shrink-0"
                                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
                                     />
                                   ) : null}
-                                  <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
+                                  <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${profileSrc ? 'hidden' : ''}`}>
                                     {info.displayName?.[0]?.toUpperCase() || "?"}
                                   </div>
                                   <div className="flex-1 min-w-0">
@@ -241,7 +235,7 @@ export default function TimelinePage() {
                                             <div key={i} className={`relative bg-black ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}>
                                               <video
                                                 data-testid={`timeline-video-${tweet.id}-${i}`}
-                                                src={url}
+                                                src={proxyImageUrl(url)}
                                                 controls
                                                 playsInline
                                                 preload="metadata"
@@ -253,7 +247,7 @@ export default function TimelinePage() {
                                             <img
                                               key={i}
                                               data-testid={`timeline-img-${tweet.id}-${i}`}
-                                              src={url}
+                                              src={proxyImageUrl(url)}
                                               alt=""
                                               className={`w-full object-cover ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}
                                               loading="lazy"
@@ -303,46 +297,3 @@ export default function TimelinePage() {
   );
 }
 
-function extractAutoTags(tweet: any): string[] {
-  const tags = new Set<string>();
-
-  const existing = tweet.tags || [];
-  for (const t of existing) {
-    tags.add(t.startsWith("#") ? t : `#${t}`);
-  }
-
-  const hashtagMatches = tweet.content?.match(/#(\w+)/g);
-  if (hashtagMatches) {
-    for (const ht of hashtagMatches) tags.add(ht);
-  }
-
-  if (tweet.source) tags.add(`#${tweet.source}`);
-
-  const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
-  if (mediaUrls.length > 0) tags.add("#hasmedia");
-  if (tweet.quotedTweetId || tweet.quotedTweetContent) tags.add("#hasquote");
-  if (tweet.inReplyToTweetId) tags.add("#reply");
-
-  const topicKeywords: Record<string, string[]> = {
-    "ai": ["AI", "artificial intelligence", "machine learning", "GPT", "LLM", "ChatGPT", "OpenAI"],
-    "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3"],
-    "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript"],
-    "startup": ["startup", "founder", "fundraising", "venture capital", "YC"],
-    "design": ["design", "UX", "UI", "Figma"],
-    "productivity": ["productivity", "workflow", "automation"],
-  };
-
-  const contentLower = (tweet.content || "").toLowerCase();
-  for (const [topic, keywords] of Object.entries(topicKeywords)) {
-    for (const kw of keywords) {
-      if (contentLower.includes(kw.toLowerCase())) {
-        tags.add(`#${topic}`);
-        break;
-      }
-    }
-  }
-
-  if ((tweet.content || "").length > 200) tags.add("#longform");
-
-  return Array.from(tags).sort();
-}

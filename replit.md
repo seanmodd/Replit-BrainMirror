@@ -37,6 +37,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `POST /api/tweets` — Import single tweet
 - `POST /api/tweets/bulk` — Bulk import tweets
 - `DELETE /api/tweets/:id` — Delete a tweet
+- `POST /api/tweets/enrich-profiles` — Batch-fetch profile images from X API for tweets missing them
 - `GET /api/stats` — Dashboard statistics (uses `getRealAuthor()` to extract true tweet authors from URL/RT content, filters out own username)
 - `GET /api/graph` — Graph nodes and edges (authors, hashtags, threads, tweets with source-based coloring; uses `getRealAuthor()` for proper author attribution)
 - `GET /api/sync-logs` — Recent sync history
@@ -44,6 +45,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `PUT /api/settings` — Update settings
 - `GET /api/x-account/status` — Check X account connection status
 - `POST /api/x-account/verify` — Verify bearer token + username (uses App-Only auth via `/2/users/by/username`)
+- `GET /api/proxy/twitter-image` — Proxy Twitter CDN images/videos to avoid CORS issues
 - `GET /api/export/:id` — Download single note as Markdown
 - `GET /api/export` — Get all notes as JSON
 - `GET /api/export/zip/download` — Download all notes as a ZIP file
@@ -59,7 +61,9 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `fetchUserTweets()` and `fetchUserLikes()` in xauth.ts for public sync
 - Requires X_CLIENT_ID and X_CLIENT_SECRET environment variables for OAuth bookmark sync
 - Settings UI: XAccountCard (public sync) and BookmarkSyncCard (OAuth bookmarks) as separate cards
-- Dashboard: Two sync buttons — "Sync Public" and "Sync Bookmarks"
+- Dashboard: Three sync buttons — "Sync Public", "Sync Bookmarks", and "Fetch Avatars"
+- Media: X API v2 `media.fields` includes `variants` for proper video URL extraction (`getBestMediaUrl` selects highest quality MP4)
+- Profile Images: Proxied through `/api/proxy/twitter-image` to avoid CORS; enrichment endpoint fetches missing profiles via bearer token
 
 ## GitHub Integration (Obsidian Sync)
 
@@ -77,6 +81,14 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - Wiki-links for authors (`[[@handle]]`) and hashtags (`[[#tag]]`)
 - ZIP download for bulk export into Obsidian vault
 - Individual file download also available
+
+## Shared Utilities (client/src/lib/utils.ts)
+
+- `isVideoUrl(url)` — Detect video URLs (mp4, webm, mov, Twitter video CDN patterns)
+- `proxyImageUrl(url)` — Route twimg.com URLs through backend proxy
+- `getAutoTags(tweet)` — Auto-compute hashtags: `#retweet` for RT content, `#bookmark` for everything else, plus existing tweet tags
+- `getDisplayInfo(tweet)` — Normalize display name/handle/content for retweets vs. originals
+- `formatContent(content)` — Parse @mentions, #hashtags, and URLs into styled React elements
 
 ## Style
 
