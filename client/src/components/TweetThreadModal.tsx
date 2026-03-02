@@ -45,12 +45,14 @@ export default function TweetThreadModal({ tweet, allTweets, open, onOpenChange 
     if (!tweet) return [];
     const convId = tweet.conversationId;
     const inThread = allTweets.filter(
-      (t: any) => t.conversationId === convId
+      (t: any) => t.conversationId === convId || t.inReplyToTweetId === tweet.tweetId || tweet.inReplyToTweetId === t.tweetId
     );
-    inThread.sort(
+    // Use a Set to deduplicate by ID in case conditions overlap
+    const uniqueThread = Array.from(new Map(inThread.map(t => [t.id, t])).values());
+    uniqueThread.sort(
       (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
-    return inThread;
+    return uniqueThread;
   }, [tweet, allTweets]);
 
   if (!tweet) return null;
