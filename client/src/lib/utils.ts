@@ -11,24 +11,44 @@ export function getDisplayInfo(tweet: any): {
   displayHandle: string;
   displayContent: string;
   isRetweet: boolean;
+  retweetedBy: string | null;
 } {
-  const isRt = tweet.source === "retweet" || tweet.content?.startsWith("RT @");
+  const content = tweet.content || "";
+  const isRt = tweet.source === "retweet" || content.startsWith("RT @");
   if (isRt) {
-    const rtMatch = tweet.content?.match(/^RT @([\w]+):\s*([\s\S]*)$/);
+    const rtMatch = content.match(/^RT @([\w]+):\s*([\s\S]*)$/);
     if (rtMatch) {
       return {
         displayName: rtMatch[1],
         displayHandle: rtMatch[1],
         displayContent: rtMatch[2],
         isRetweet: true,
+        retweetedBy: tweet.authorName || tweet.authorHandle,
       };
     }
   }
+
+  const urlMatch = tweet.tweetUrl?.match(/x\.com\/(\w+)\/status/);
+  const urlAuthor = urlMatch ? urlMatch[1] : null;
+  const storedHandle = tweet.authorHandle || "unknown";
+  const storedName = tweet.authorName || storedHandle;
+
+  if (urlAuthor && urlAuthor.toLowerCase() !== storedHandle.toLowerCase()) {
+    return {
+      displayName: urlAuthor,
+      displayHandle: urlAuthor,
+      displayContent: content,
+      isRetweet: false,
+      retweetedBy: null,
+    };
+  }
+
   return {
-    displayName: tweet.authorName,
-    displayHandle: tweet.authorHandle,
-    displayContent: tweet.content,
-    isRetweet: tweet.source === "retweet",
+    displayName: storedName,
+    displayHandle: storedHandle,
+    displayContent: content,
+    isRetweet: isRt,
+    retweetedBy: null,
   };
 }
 

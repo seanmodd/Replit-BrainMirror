@@ -189,7 +189,7 @@ export default function Dashboard() {
                       {info.isRetweet && (
                         <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[44px]">
                           <Repeat2 size={12} />
-                          <span className="font-bold">You reposted</span>
+                          <span className="font-bold">{info.retweetedBy ? `${info.retweetedBy} reposted` : "You reposted"}</span>
                         </div>
                       )}
                       <div className="flex gap-3">

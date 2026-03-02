@@ -345,7 +345,7 @@ export default function BookmarksView() {
 }
 
 function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[]; onDelete: () => void }) {
-  const { displayName, displayHandle, displayContent, isRetweet } = getDisplayInfo(tweet);
+  const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
   const quotedTweet = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
 
   return (
@@ -353,7 +353,7 @@ function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[
       {isRetweet && (
         <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[52px]">
           <Repeat2 size={14} />
-          <span className="font-bold">You reposted</span>
+          <span className="font-bold">{retweetedBy ? `${retweetedBy} reposted` : "You reposted"}</span>
         </div>
       )}
 

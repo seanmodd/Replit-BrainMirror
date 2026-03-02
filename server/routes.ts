@@ -455,16 +455,39 @@ export async function registerRoutes(
       let totalFetched = 0;
 
       try {
-        const importTweets = async (tweetList: any[], authorMap: Map<string, any>) => {
+        const importTweets = async (tweetList: any[], authorMap: Map<string, any>, refTweetsMap: Map<string, any>) => {
           let imported = 0;
           let skipped = 0;
           for (const tw of tweetList) {
             const existing = await storage.getTweetNoteByTweetId(tw.id);
             if (existing) { skipped++; continue; }
 
-            const author = authorMap.get(tw.author_id);
-            const authorHandle = author?.username || username;
-            const authorName = author?.name || authorHandle;
+            const isRetweet = tw.referenced_tweets?.some((r: any) => r.type === "retweeted");
+            const retweetedRef = tw.referenced_tweets?.find((r: any) => r.type === "retweeted");
+
+            let authorHandle: string;
+            let authorName: string;
+            let tweetUrl: string;
+
+            if (isRetweet && retweetedRef) {
+              const originalTweet = refTweetsMap.get(retweetedRef.id);
+              const originalAuthor = originalTweet ? authorMap.get(originalTweet.author_id) : null;
+              if (originalAuthor) {
+                authorHandle = originalAuthor.username;
+                authorName = originalAuthor.name || authorHandle;
+                tweetUrl = `https://x.com/${authorHandle}/status/${retweetedRef.id}`;
+              } else {
+                const rtMatch = tw.text?.match(/^RT @([\w]+):/);
+                authorHandle = rtMatch ? rtMatch[1] : (authorMap.get(tw.author_id)?.username || username);
+                authorName = authorHandle;
+                tweetUrl = `https://x.com/${authorHandle}/status/${retweetedRef.id}`;
+              }
+            } else {
+              const author = authorMap.get(tw.author_id);
+              authorHandle = author?.username || username;
+              authorName = author?.name || authorHandle;
+              tweetUrl = `https://x.com/${authorHandle}/status/${tw.id}`;
+            }
 
             const tags: string[] = [];
             if (tw.entities?.hashtags) {
@@ -478,11 +501,10 @@ export async function registerRoutes(
             const replyToId = tw.referenced_tweets?.find((r: any) => r.type === "replied_to")?.id;
             const quotedId = tw.referenced_tweets?.find((r: any) => r.type === "quoted")?.id;
 
-            const isRetweet = tw.referenced_tweets?.some((r: any) => r.type === "retweeted");
             await storage.createTweetNote({
               tweetId: tw.id,
               conversationId: tw.conversation_id || tw.id,
-              tweetUrl: `https://x.com/${authorHandle}/status/${tw.id}`,
+              tweetUrl,
               authorHandle,
               authorName,
               createdAt: tw.created_at,
@@ -500,8 +522,8 @@ export async function registerRoutes(
         };
 
         if (syncTypes.includes("tweets")) {
-          const { tweets, authors } = await fetchUserTweets(bearerToken, userId);
-          const result = await importTweets(tweets, authors);
+          const { tweets, authors, refTweets } = await fetchUserTweets(bearerToken, userId);
+          const result = await importTweets(tweets, authors, refTweets);
           totalImported += result.imported;
           totalSkipped += result.skipped;
           totalFetched += tweets.length;

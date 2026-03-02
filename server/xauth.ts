@@ -233,11 +233,11 @@ export function getRedirectUriForDisplay(): string {
   return getRedirectUri();
 }
 
-export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
+export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any> }> {
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
     "user.fields": "name,username",
-    expansions: "author_id",
+    expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id",
     max_results: "100",
   });
 
@@ -261,7 +261,13 @@ export async function fetchUserTweets(bearerToken: string, userId: string): Prom
       authors.set(user.id, user);
     }
   }
-  return { tweets, authors };
+  const refTweets = new Map<string, any>();
+  if (data.includes?.tweets) {
+    for (const tw of data.includes.tweets) {
+      refTweets.set(tw.id, tw);
+    }
+  }
+  return { tweets, authors, refTweets };
 }
 
 export async function fetchUserLikes(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
