@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2 } from "lucide-react";
+import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2, Play } from "lucide-react";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
 
 interface TweetThreadModalProps {
@@ -8,6 +8,42 @@ interface TweetThreadModalProps {
   allTweets: any[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") ||
+    lower.includes("/video/") || lower.includes("video.twimg.com") ||
+    lower.includes("/ext_tw_video/") || lower.includes("/amplify_video/");
+}
+
+function MediaItem({ url, tweetId, index, single }: { url: string; tweetId: string; index: number; single: boolean }) {
+  if (isVideoUrl(url)) {
+    return (
+      <div className={`relative ${single ? "max-h-[400px]" : "h-[180px]"} bg-black`}>
+        <video
+          data-testid={`modal-video-media-${tweetId}-${index}`}
+          src={url}
+          controls
+          playsInline
+          preload="metadata"
+          className={`w-full object-contain ${single ? "max-h-[400px]" : "h-[180px]"}`}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block">
+      <img
+        data-testid={`modal-img-media-${tweetId}-${index}`}
+        src={url}
+        alt=""
+        className={`w-full object-cover ${single ? "max-h-[400px]" : "h-[180px]"} hover:opacity-90 transition-opacity`}
+        loading="lazy"
+      />
+    </a>
+  );
 }
 
 export default function TweetThreadModal({ tweet, allTweets, open, onOpenChange }: TweetThreadModalProps) {
@@ -32,10 +68,11 @@ export default function TweetThreadModal({ tweet, allTweets, open, onOpenChange 
       <DialogContent
         data-testid="modal-tweet-thread"
         className="max-w-[600px] max-h-[85vh] overflow-y-auto p-0 gap-0"
+        aria-describedby={undefined}
       >
         <DialogHeader className="px-4 pt-4 pb-2 border-b border-border sticky top-0 bg-background z-10">
           <DialogTitle className="text-lg font-bold">
-            {hasThread ? "Thread" : "Tweet"}
+            {hasThread ? `Thread (${threadTweets.length} tweets)` : "Tweet"}
           </DialogTitle>
         </DialogHeader>
 
@@ -72,21 +109,19 @@ function ThreadTweetItem({
   const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
 
+  const contentLinks = (tweet.links || []).filter((u: string) => u && u !== "" && u !== "undefined");
+  const videoLinks = contentLinks.filter((u: string) => isVideoUrl(u));
+  const allMedia = [...mediaUrls, ...videoLinks.filter((v: string) => !mediaUrls.includes(v))];
+
   const hasStoredQuote = tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle;
   const fallbackQuote = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
   const showQuote = hasStoredQuote || fallbackQuote;
   const quoteName = hasStoredQuote ? tweet.quotedTweetAuthorName : fallbackQuote?.authorName;
   const quoteHandle = hasStoredQuote ? tweet.quotedTweetAuthorHandle : fallbackQuote?.authorHandle;
   const quoteContent = hasStoredQuote ? tweet.quotedTweetContent : fallbackQuote?.content;
+  const quoteMediaUrls = fallbackQuote ? (fallbackQuote.mediaUrls || []).filter((u: string) => u && u !== "") : [];
 
-  const fullDate = new Date(tweet.createdAt).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const fullDate = formatTimeAgo(tweet.createdAt);
 
   return (
     <article
@@ -124,17 +159,10 @@ function ThreadTweetItem({
             {formatContent(displayContent)}
           </div>
 
-          {mediaUrls.length > 0 && (
-            <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
-              {mediaUrls.map((url: string, i: number) => (
-                <img
-                  key={i}
-                  data-testid={`modal-img-media-${tweet.id}-${i}`}
-                  src={url}
-                  alt=""
-                  className={`w-full object-cover ${mediaUrls.length === 1 ? "max-h-[400px]" : "h-[180px]"}`}
-                  loading="lazy"
-                />
+          {allMedia.length > 0 && (
+            <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${allMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+              {allMedia.map((url: string, i: number) => (
+                <MediaItem key={i} url={url} tweetId={tweet.id} index={i} single={allMedia.length === 1} />
               ))}
             </div>
           )}
@@ -152,6 +180,13 @@ function ThreadTweetItem({
                 <div className="text-[14px] text-foreground leading-[18px] whitespace-pre-wrap break-words">
                   {formatContent(quoteContent || "")}
                 </div>
+                {quoteMediaUrls.length > 0 && (
+                  <div className={`mt-2 rounded-xl overflow-hidden border border-border ${quoteMediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+                    {quoteMediaUrls.map((url: string, i: number) => (
+                      <MediaItem key={i} url={url} tweetId={`quote-${tweet.id}`} index={i} single={quoteMediaUrls.length === 1} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

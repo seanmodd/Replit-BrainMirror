@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo, useState } from "react";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import TweetThreadModal from "@/components/TweetThreadModal";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -72,6 +73,7 @@ export default function TimelinePage() {
 
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [threadTweet, setThreadTweet] = useState<any>(null);
 
   const dateGroups = useMemo(() => {
     if (!tweets) return [];
@@ -196,7 +198,7 @@ export default function TimelinePage() {
                             const info = getDisplayInfo(tweet);
                             const autoTags = extractAutoTags(tweet);
                             return (
-                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
+                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onClick={() => setThreadTweet(tweet)}>
                                 <div className="flex gap-3">
                                   <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0">
                                     {info.displayName?.[0]?.toUpperCase() || "?"}
@@ -243,6 +245,13 @@ export default function TimelinePage() {
           ))}
         </div>
       )}
+
+      <TweetThreadModal
+        tweet={threadTweet}
+        allTweets={tweets || []}
+        open={!!threadTweet}
+        onOpenChange={(open) => { if (!open) setThreadTweet(null); }}
+      />
     </div>
   );
 }
@@ -263,8 +272,8 @@ function extractAutoTags(tweet: any): string[] {
   if (tweet.source) tags.add(`#${tweet.source}`);
 
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
-  if (mediaUrls.length > 0) tags.add("#has-media");
-  if (tweet.quotedTweetId || tweet.quotedTweetContent) tags.add("#has-quote");
+  if (mediaUrls.length > 0) tags.add("#hasmedia");
+  if (tweet.quotedTweetId || tweet.quotedTweetContent) tags.add("#hasquote");
   if (tweet.inReplyToTweetId) tags.add("#reply");
 
   const topicKeywords: Record<string, string[]> = {
@@ -286,7 +295,7 @@ function extractAutoTags(tweet: any): string[] {
     }
   }
 
-  if ((tweet.content || "").length > 200) tags.add("#long-form");
+  if ((tweet.content || "").length > 200) tags.add("#longform");
 
   return Array.from(tags).sort();
 }

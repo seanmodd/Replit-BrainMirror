@@ -51,10 +51,10 @@ function autoGenerateTags(tweet: TweetNote): string[] {
 
   const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
   if (mediaUrls.length > 0) {
-    tags.add("#has-media");
+    tags.add("#hasmedia");
   }
   if (tweet.quotedTweetId || tweet.quotedTweetContent) {
-    tags.add("#has-quote");
+    tags.add("#hasquote");
   }
   if (tweet.inReplyToTweetId) {
     tags.add("#reply");
@@ -94,11 +94,11 @@ function autoGenerateTags(tweet: TweetNote): string[] {
 
   const urlMatches = tweet.content.match(/https?:\/\/[^\s]+/g);
   if (urlMatches && urlMatches.length > 0) {
-    tags.add("#has-links");
+    tags.add("#haslinks");
   }
 
   if (tweet.content.length > 200) {
-    tags.add("#long-form");
+    tags.add("#longform");
   }
 
   return Array.from(tags).sort();
