@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,6 +23,7 @@ export const tweetNotes = pgTable("tweet_notes", {
   quotedTweetAuthorName: text("quoted_tweet_author_name"),
   mediaUrls: text("media_urls").array().notNull().default(sql`'{}'::text[]`),
   authorProfileImageUrl: text("author_profile_image_url"),
+  linkCards: jsonb("link_cards").default([]),
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
 

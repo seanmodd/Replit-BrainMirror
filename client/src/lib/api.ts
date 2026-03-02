@@ -33,6 +33,7 @@ export const api = {
     bulkCreate: (tweets: any[]) => fetchJSON<any>("/tweets/bulk", { method: "POST", body: JSON.stringify({ tweets }) }),
     delete: (id: string) => fetchJSON<void>(`/tweets/${id}`, { method: "DELETE" }),
     enrichProfiles: () => fetchJSON<any>("/tweets/enrich-profiles", { method: "POST" }),
+    enrichContent: () => fetchJSON<any>("/tweets/enrich-content", { method: "POST" }),
   },
   stats: () => fetchJSON<any>("/stats"),
   graph: () => fetchJSON<any>("/graph"),

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2, Play } from "lucide-react";
-import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags, getLinkCards } from "@/lib/utils";
 
 interface TweetThreadModalProps {
   tweet: any;
@@ -171,6 +171,20 @@ function ThreadTweetItem({
               ))}
             </div>
           )}
+
+          {(() => {
+            const cards = getLinkCards(tweet);
+            return cards.length > 0 && allMedia.length === 0 ? (
+              <a href={cards[0].url} target="_blank" rel="noreferrer" className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors block">
+                {cards[0].image && <img src={proxyImageUrl(cards[0].image)} alt="" className="w-full h-[200px] object-cover border-b border-border" loading="lazy" />}
+                <div className="px-3 py-2.5">
+                  {cards[0].displayUrl && <div className="text-[13px] text-muted-foreground truncate">{cards[0].displayUrl}</div>}
+                  {cards[0].title && <div className="text-[15px] text-foreground leading-[20px] truncate">{cards[0].title}</div>}
+                  {cards[0].description && <div className="text-[13px] text-muted-foreground leading-[16px] line-clamp-2 mt-0.5">{cards[0].description}</div>}
+                </div>
+              </a>
+            ) : null;
+          })()}
 
           {showQuote && (
             <div className="mt-3 border border-border rounded-2xl overflow-hidden">

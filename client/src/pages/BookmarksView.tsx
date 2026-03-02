@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags, getLinkCards, type LinkCardData } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
 
 type SourceTab = "all" | "bookmark" | "retweet" | "public" | "manual";
@@ -353,6 +353,38 @@ export default function BookmarksView() {
   );
 }
 
+function LinkPreviewCard({ card }: { card: LinkCardData }) {
+  return (
+    <a
+      href={card.url}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors block"
+    >
+      {card.image && (
+        <img
+          src={proxyImageUrl(card.image)}
+          alt=""
+          className="w-full h-[200px] object-cover border-b border-border"
+          loading="lazy"
+        />
+      )}
+      <div className="px-3 py-2.5">
+        {card.displayUrl && (
+          <div className="text-[13px] text-muted-foreground truncate">{card.displayUrl}</div>
+        )}
+        {card.title && (
+          <div className="text-[15px] text-foreground font-normal leading-[20px] truncate">{card.title}</div>
+        )}
+        {card.description && (
+          <div className="text-[13px] text-muted-foreground leading-[16px] line-clamp-2 mt-0.5">{card.description}</div>
+        )}
+      </div>
+    </a>
+  );
+}
+
 function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; allTweets: any[]; onDelete: () => void; onDoubleClick: () => void }) {
   const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
 
@@ -365,6 +397,7 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
   const quoteCreatedAt = fallbackQuote?.createdAt;
 
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+  const linkCards = getLinkCards(tweet);
 
   return (
     <article data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer group" onDoubleClick={onDoubleClick}>
@@ -454,6 +487,10 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
                 )
               )}
             </div>
+          )}
+
+          {linkCards.length > 0 && mediaUrls.length === 0 && (
+            <LinkPreviewCard card={linkCards[0]} />
           )}
 
           {showQuote && (

@@ -113,6 +113,21 @@ export function getAutoTags(tweet: any): string[] {
   return Array.from(tags);
 }
 
+export interface LinkCardData {
+  url: string;
+  displayUrl?: string;
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+}
+
+export function getLinkCards(tweet: any): LinkCardData[] {
+  if (tweet.linkCards && Array.isArray(tweet.linkCards) && tweet.linkCards.length > 0) {
+    return tweet.linkCards;
+  }
+  return [];
+}
+
 export function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleString("en-US", {

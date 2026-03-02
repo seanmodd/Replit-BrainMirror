@@ -695,6 +695,24 @@ export async function registerRoutes(
       let totalFetched = 0;
 
       try {
+        const extractLinkCards = (entities: any) => {
+          const cards: any[] = [];
+          if (entities?.urls) {
+            for (const u of entities.urls) {
+              if (u.title || u.description || u.images) {
+                cards.push({
+                  url: u.expanded_url || u.url,
+                  displayUrl: u.display_url,
+                  title: u.title || null,
+                  description: u.description || null,
+                  image: u.images?.[0]?.url || null,
+                });
+              }
+            }
+          }
+          return cards;
+        };
+
         const importTweets = async (tweetList: any[], authorMap: Map<string, any>, refTweetsMap: Map<string, any>, mediaMap: Map<string, any>) => {
           let imported = 0;
           let skipped = 0;
@@ -706,6 +724,7 @@ export async function registerRoutes(
             let authorName: string;
             let tweetUrl: string;
             let authorProfileImageUrl: string | null = null;
+            let fullContent = tw.text;
 
             if (isRetweet && retweetedRef) {
               const originalTweet = refTweetsMap.get(retweetedRef.id);
@@ -720,6 +739,9 @@ export async function registerRoutes(
                 authorHandle = rtMatch ? rtMatch[1] : (authorMap.get(tw.author_id)?.username || username);
                 authorName = authorHandle;
                 tweetUrl = `https://x.com/${authorHandle}/status/${retweetedRef.id}`;
+              }
+              if (originalTweet?.text) {
+                fullContent = `RT @${authorHandle}: ${originalTweet.text}`;
               }
             } else {
               const author = authorMap.get(tw.author_id);
@@ -746,12 +768,22 @@ export async function registerRoutes(
             }
 
             const mediaUrls: string[] = [];
+            const sourceTweet = (isRetweet && retweetedRef) ? refTweetsMap.get(retweetedRef.id) : tw;
+            if (sourceTweet?.attachments?.media_keys) {
+              for (const key of sourceTweet.attachments.media_keys) {
+                const m = mediaMap.get(key);
+                if (m) {
+                  const bestUrl = getBestMediaUrl(m);
+                  if (bestUrl) mediaUrls.push(bestUrl);
+                }
+              }
+            }
             if (tw.attachments?.media_keys) {
               for (const key of tw.attachments.media_keys) {
                 const m = mediaMap.get(key);
                 if (m) {
                   const bestUrl = getBestMediaUrl(m);
-                  if (bestUrl) mediaUrls.push(bestUrl);
+                  if (bestUrl && !mediaUrls.includes(bestUrl)) mediaUrls.push(bestUrl);
                 }
               }
             }
@@ -768,6 +800,8 @@ export async function registerRoutes(
               }
             }
 
+            const linkCards = extractLinkCards(sourceTweet?.entities || tw.entities);
+
             const existing = await storage.getTweetNoteByTweetId(tw.id);
             if (existing) {
               const updates: any = {};
@@ -779,6 +813,9 @@ export async function registerRoutes(
               if (authorProfileImageUrl && !existing.authorProfileImageUrl) {
                 updates.authorProfileImageUrl = authorProfileImageUrl;
               }
+              if (existing.content?.includes("…") && fullContent && !fullContent.includes("…")) {
+                updates.content = fullContent;
+              }
               if (quotedTweetContent && !existing.quotedTweetContent) {
                 updates.quotedTweetContent = quotedTweetContent;
                 updates.quotedTweetAuthorHandle = quotedTweetAuthorHandle;
@@ -787,6 +824,12 @@ export async function registerRoutes(
               }
               if (mediaUrls.length > 0 && (!existing.mediaUrls || existing.mediaUrls.length === 0)) {
                 updates.mediaUrls = mediaUrls;
+              }
+              if (linkCards.length > 0 && (!existing.linkCards || (existing.linkCards as any[]).length === 0)) {
+                updates.linkCards = linkCards;
+              }
+              if ((!existing.links || existing.links.length === 0) && tw.entities?.urls) {
+                updates.links = tw.entities.urls.map((u: any) => u.expanded_url);
               }
               if (Object.keys(updates).length > 0) {
                 await storage.updateTweetNote(existing.id, updates);
@@ -814,7 +857,7 @@ export async function registerRoutes(
               authorName,
               authorProfileImageUrl,
               createdAt: tw.created_at,
-              content: tw.text,
+              content: fullContent,
               tags,
               threadPosition: null,
               quotedTweetId: quotedId,
@@ -825,6 +868,7 @@ export async function registerRoutes(
               quotedTweetAuthorHandle,
               quotedTweetAuthorName,
               mediaUrls,
+              linkCards,
             });
             imported++;
           }
@@ -870,6 +914,24 @@ export async function registerRoutes(
 
       try {
         const { tweets: bookmarks, authors, refTweets, media } = await fetchBookmarks();
+
+        const extractLinkCards = (entities: any) => {
+          const cards: any[] = [];
+          if (entities?.urls) {
+            for (const u of entities.urls) {
+              if (u.title || u.description || u.images) {
+                cards.push({
+                  url: u.expanded_url || u.url,
+                  displayUrl: u.display_url,
+                  title: u.title || null,
+                  description: u.description || null,
+                  image: u.images?.[0]?.url || null,
+                });
+              }
+            }
+          }
+          return cards;
+        };
 
         let imported = 0;
         let skipped = 0;
@@ -922,6 +984,8 @@ export async function registerRoutes(
             }
           }
 
+          const linkCards = extractLinkCards(bm.entities);
+
           const existing = await storage.getTweetNoteByTweetId(bm.id);
           if (existing) {
             const updates: any = {};
@@ -936,6 +1000,9 @@ export async function registerRoutes(
             if (existing.source !== "bookmark") {
               updates.source = "bookmark";
             }
+            if (existing.content?.includes("…") && bm.text && !bm.text.includes("…")) {
+              updates.content = bm.text;
+            }
             if (quotedTweetContent && !existing.quotedTweetContent) {
               updates.quotedTweetContent = quotedTweetContent;
               updates.quotedTweetAuthorHandle = quotedTweetAuthorHandle;
@@ -944,6 +1011,12 @@ export async function registerRoutes(
             }
             if (mediaUrls.length > 0 && (!existing.mediaUrls || existing.mediaUrls.length === 0)) {
               updates.mediaUrls = mediaUrls;
+            }
+            if (linkCards.length > 0 && (!existing.linkCards || (existing.linkCards as any[]).length === 0)) {
+              updates.linkCards = linkCards;
+            }
+            if ((!existing.links || existing.links.length === 0) && bm.entities?.urls) {
+              updates.links = bm.entities.urls.map((u: any) => u.expanded_url);
             }
             if (Object.keys(updates).length > 0) {
               await storage.updateTweetNote(existing.id, updates);
@@ -986,6 +1059,7 @@ export async function registerRoutes(
             quotedTweetAuthorHandle,
             quotedTweetAuthorName,
             mediaUrls,
+            linkCards,
           });
           imported++;
         }
@@ -1088,6 +1162,164 @@ export async function registerRoutes(
       res.json({ updated, looked_up: lookupCount, total_needing: tweetsNeedingProfiles.length });
     } catch (err: any) {
       console.error("Enrich profiles error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Enrich Tweet Content ───────────────────────────────────
+
+  app.post("/api/tweets/enrich-content", async (req, res) => {
+    try {
+      const bearerToken = process.env.X_BEARER_TOKEN;
+      if (!bearerToken) {
+        return res.status(401).json({ message: "No bearer token configured" });
+      }
+
+      const allTweets = await storage.getAllTweetNotes();
+      const needsEnrich = allTweets.filter(t =>
+        t.content?.includes("…") ||
+        !t.mediaUrls || t.mediaUrls.length === 0 ||
+        !t.linkCards || (t.linkCards as any[]).length === 0
+      );
+
+      if (needsEnrich.length === 0) {
+        return res.json({ updated: 0, message: "All tweets are already enriched" });
+      }
+
+      const tweetIds = needsEnrich.map(t => t.tweetId).filter(Boolean);
+      let totalUpdated = 0;
+
+      for (let i = 0; i < tweetIds.length; i += 100) {
+        const batch = tweetIds.slice(i, i + 100);
+        const params = new URLSearchParams({
+          ids: batch.join(","),
+          "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
+          "user.fields": "name,username,profile_image_url",
+          "media.fields": "url,preview_image_url,type,variants",
+          expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
+        });
+
+        const response = await fetch(
+          `https://api.x.com/2/tweets?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${bearerToken}` } }
+        );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`Tweet lookup failed (${response.status}):`, errText);
+          if (response.status === 402) {
+            return res.status(402).json({ message: "X API credits depleted", updated: totalUpdated });
+          }
+          continue;
+        }
+
+        const data = await response.json();
+        const fetchedTweets = data.data || [];
+        const authorMap = new Map<string, any>();
+        const refTweetsMap = new Map<string, any>();
+        const mediaMap = new Map<string, any>();
+
+        if (data.includes?.users) {
+          for (const user of data.includes.users) {
+            authorMap.set(user.id, user);
+          }
+        }
+        if (data.includes?.tweets) {
+          for (const tw of data.includes.tweets) {
+            refTweetsMap.set(tw.id, tw);
+          }
+        }
+        if (data.includes?.media) {
+          for (const m of data.includes.media) {
+            mediaMap.set(m.media_key, m);
+          }
+        }
+
+        for (const tw of fetchedTweets) {
+          const existing = needsEnrich.find(t => t.tweetId === tw.id);
+          if (!existing) continue;
+
+          const updates: any = {};
+
+          const isRetweet = tw.referenced_tweets?.some((r: any) => r.type === "retweeted");
+          const retweetedRef = tw.referenced_tweets?.find((r: any) => r.type === "retweeted");
+
+          if (existing.content?.includes("…")) {
+            if (isRetweet && retweetedRef) {
+              const originalTweet = refTweetsMap.get(retweetedRef.id);
+              if (originalTweet?.text) {
+                const originalAuthor = originalTweet.author_id ? authorMap.get(originalTweet.author_id) : null;
+                const handle = originalAuthor?.username || existing.authorHandle;
+                updates.content = `RT @${handle}: ${originalTweet.text}`;
+              }
+            } else if (tw.text && !tw.text.includes("…")) {
+              updates.content = tw.text;
+            }
+          }
+
+          const mediaUrls: string[] = [];
+          const sourceTweet = (isRetweet && retweetedRef) ? refTweetsMap.get(retweetedRef.id) : tw;
+          if (sourceTweet?.attachments?.media_keys) {
+            for (const key of sourceTweet.attachments.media_keys) {
+              const m = mediaMap.get(key);
+              if (m) {
+                const bestUrl = getBestMediaUrl(m);
+                if (bestUrl) mediaUrls.push(bestUrl);
+              }
+            }
+          }
+          if (tw.attachments?.media_keys) {
+            for (const key of tw.attachments.media_keys) {
+              const m = mediaMap.get(key);
+              if (m) {
+                const bestUrl = getBestMediaUrl(m);
+                if (bestUrl && !mediaUrls.includes(bestUrl)) mediaUrls.push(bestUrl);
+              }
+            }
+          }
+          if (mediaUrls.length > 0 && (!existing.mediaUrls || existing.mediaUrls.length === 0)) {
+            updates.mediaUrls = mediaUrls;
+          }
+
+          const sourceEntities = sourceTweet?.entities || tw.entities;
+          if (sourceEntities?.urls) {
+            const linkCards: any[] = [];
+            for (const u of sourceEntities.urls) {
+              if (u.title || u.description || u.images) {
+                linkCards.push({
+                  url: u.expanded_url || u.url,
+                  displayUrl: u.display_url,
+                  title: u.title || null,
+                  description: u.description || null,
+                  image: u.images?.[0]?.url || null,
+                });
+              }
+            }
+            if (linkCards.length > 0 && (!existing.linkCards || (existing.linkCards as any[]).length === 0)) {
+              updates.linkCards = linkCards;
+            }
+            if ((!existing.links || existing.links.length === 0)) {
+              updates.links = sourceEntities.urls.map((u: any) => u.expanded_url);
+            }
+          }
+
+          if (!existing.authorProfileImageUrl) {
+            const author = authorMap.get(tw.author_id);
+            if (author?.profile_image_url) {
+              updates.authorProfileImageUrl = author.profile_image_url.replace("_normal", "_bigger");
+            }
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await storage.updateTweetNote(existing.id, updates);
+            totalUpdated++;
+          }
+        }
+      }
+
+      res.json({ updated: totalUpdated, total_needing: needsEnrich.length });
+    } catch (err: any) {
+      console.error("Enrich content error:", err);
       res.status(500).json({ message: err.message });
     }
   });

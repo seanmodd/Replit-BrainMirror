@@ -6,7 +6,7 @@ import { ArrowLeft, CalendarDays, Twitter, ExternalLink, Bookmark, Repeat2, Glob
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo, useState } from "react";
-import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags, getLinkCards } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
 
 const MONTH_NAMES = [
@@ -256,6 +256,19 @@ export default function TimelinePage() {
                                         ))}
                                       </div>
                                     )}
+                                    {(() => {
+                                      const cards = getLinkCards(tweet);
+                                      return cards.length > 0 && allMedia.length === 0 ? (
+                                        <a href={cards[0].url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-2 border border-border rounded-xl overflow-hidden hover:bg-foreground/[0.03] transition-colors block">
+                                          {cards[0].image && <img src={proxyImageUrl(cards[0].image)} alt="" className="w-full h-[140px] object-cover border-b border-border" loading="lazy" />}
+                                          <div className="px-3 py-2">
+                                            {cards[0].displayUrl && <div className="text-[12px] text-muted-foreground truncate">{cards[0].displayUrl}</div>}
+                                            {cards[0].title && <div className="text-[13px] text-foreground leading-[16px] truncate">{cards[0].title}</div>}
+                                            {cards[0].description && <div className="text-[12px] text-muted-foreground leading-[14px] line-clamp-2 mt-0.5">{cards[0].description}</div>}
+                                          </div>
+                                        </a>
+                                      ) : null;
+                                    })()}
                                     {autoTags.length > 0 && (
                                       <div className="flex flex-wrap gap-1 mt-2">
                                         {autoTags.map((tag, i) => (
