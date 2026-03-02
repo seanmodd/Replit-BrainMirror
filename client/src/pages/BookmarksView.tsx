@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
-import { Search, ExternalLink, Plus, Trash2, Bookmark, Repeat2, FileText, MessageCircle, Heart, BarChart2, Share, MoreHorizontal, ArrowUpDown, Filter, ChevronDown, X } from "lucide-react";
+import { Search, ExternalLink, Plus, Trash2, Bookmark, Repeat2, FileText, MessageCircle, Heart, BarChart2, Share, MoreHorizontal, ArrowUpDown, Filter, ChevronDown, X, Globe, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -380,6 +380,10 @@ function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[
               <span className="text-muted-foreground text-[15px] truncate">@{displayHandle}</span>
               <span className="text-muted-foreground text-[15px] shrink-0">·</span>
               <span className="text-muted-foreground text-[15px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
+              {tweet.source === "bookmark" && <Bookmark size={13} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-0.5" data-testid={`icon-source-${tweet.id}`} />}
+              {tweet.source === "retweet" && <Repeat2 size={13} className="text-[#00ba7c] shrink-0 ml-0.5" data-testid={`icon-source-${tweet.id}`} />}
+              {tweet.source === "public" && <Globe size={13} className="text-[#A78BFA] shrink-0 ml-0.5" data-testid={`icon-source-${tweet.id}`} />}
+              {tweet.source === "manual" && <Pencil size={13} className="text-muted-foreground shrink-0 ml-0.5" data-testid={`icon-source-${tweet.id}`} />}
             </div>
             <div className="flex items-center">
               <button

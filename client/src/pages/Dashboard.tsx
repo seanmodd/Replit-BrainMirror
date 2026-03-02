@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal, Globe, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -209,9 +209,10 @@ export default function Dashboard() {
                             <span className="text-muted-foreground text-[13px] truncate">@{info.displayHandle}</span>
                             <span className="text-muted-foreground text-[13px]">·</span>
                             <span className="text-muted-foreground text-[13px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
-                            {tweet.source === "bookmark" && (
-                              <Bookmark size={12} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-1" />
-                            )}
+                            {tweet.source === "bookmark" && <Bookmark size={12} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-0.5" />}
+                            {tweet.source === "retweet" && <Repeat2 size={12} className="text-[#00ba7c] shrink-0 ml-0.5" />}
+                            {tweet.source === "public" && <Globe size={12} className="text-[#A78BFA] shrink-0 ml-0.5" />}
+                            {tweet.source === "manual" && <Pencil size={12} className="text-muted-foreground shrink-0 ml-0.5" />}
                           </div>
                           <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 line-clamp-3 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
                           {mediaUrls.length > 0 && (
