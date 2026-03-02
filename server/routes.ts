@@ -282,28 +282,64 @@ export async function registerRoutes(
 
   app.get("/api/stats", async (_req, res) => {
     try {
-      const [allTweets, tags, recentSyncs] = await Promise.all([
+      const [allTweets, recentSyncs] = await Promise.all([
         storage.getAllTweetNotes(),
-        storage.getUniqueTags(),
         storage.getRecentSyncLogs(5),
       ]);
       const ownUsername = (process.env.X_USERNAME || "").toLowerCase();
       const authorMap = new Map<string, { handle: string; name: string; count: number }>();
+      const allTagsSet = new Set<string>();
+
+      const topicKeywords: Record<string, string[]> = {
+        "ai": ["AI", "artificial intelligence", "machine learning", "GPT", "LLM", "ChatGPT", "OpenAI"],
+        "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3"],
+        "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript"],
+        "startup": ["startup", "founder", "fundraising", "venture capital", "YC"],
+        "design": ["design", "UX", "UI", "Figma"],
+        "productivity": ["productivity", "workflow", "automation"],
+      };
+
       for (const tweet of allTweets) {
         const real = getRealAuthor(tweet);
         const key = real.handle.toLowerCase();
-        if (key === ownUsername || key === "unknown") continue;
-        const existing = authorMap.get(key);
-        if (existing) {
-          existing.count++;
-          if (real.name !== real.handle && existing.name === existing.handle) {
-            existing.name = real.name;
+        if (key !== ownUsername && key !== "unknown") {
+          const existing = authorMap.get(key);
+          if (existing) {
+            existing.count++;
+            if (real.name !== real.handle && existing.name === existing.handle) {
+              existing.name = real.name;
+            }
+          } else {
+            authorMap.set(key, { handle: real.handle, name: real.name, count: 1 });
           }
-        } else {
-          authorMap.set(key, { handle: real.handle, name: real.name, count: 1 });
         }
+
+        for (const t of (tweet.tags || [])) {
+          allTagsSet.add(t.startsWith("#") ? t : `#${t}`);
+        }
+        const hashtagMatches = (tweet.content || "").match(/#(\w+)/g);
+        if (hashtagMatches) {
+          for (const ht of hashtagMatches) allTagsSet.add(ht);
+        }
+        if (tweet.source) allTagsSet.add(`#${tweet.source}`);
+        const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+        if (mediaUrls.length > 0) allTagsSet.add("#hasmedia");
+        if (tweet.quotedTweetId || tweet.quotedTweetContent) allTagsSet.add("#hasquote");
+        if (tweet.inReplyToTweetId) allTagsSet.add("#reply");
+        const contentLower = (tweet.content || "").toLowerCase();
+        for (const [topic, keywords] of Object.entries(topicKeywords)) {
+          for (const kw of keywords) {
+            if (contentLower.includes(kw.toLowerCase())) {
+              allTagsSet.add(`#${topic}`);
+              break;
+            }
+          }
+        }
+        if ((tweet.content || "").length > 200) allTagsSet.add("#longform");
       }
+
       const authors = Array.from(authorMap.values()).sort((a, b) => b.count - a.count);
+      const tags = Array.from(allTagsSet).sort();
       const count = allTweets.length;
       res.json({
         totalTweets: count,
