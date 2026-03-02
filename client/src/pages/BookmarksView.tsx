@@ -122,7 +122,7 @@ export default function BookmarksView() {
     return counts;
   }, [allTweetsRaw]);
 
-  const allTags = stats?.tags || [];
+  const allTags: { tag: string; count: number }[] = stats?.tags || [];
   const hasActiveFilters = filterAuthor || sortBy !== "newest";
 
   const deleteMutation = useMutation({
@@ -190,14 +190,14 @@ export default function BookmarksView() {
             >
               All
             </Badge>
-            {allTags.map((tag: string) => (
+            {allTags.map(({ tag, count }) => (
               <Badge
                 key={tag}
                 variant={selectedTag === tag ? "default" : "outline"}
                 className={`cursor-pointer whitespace-nowrap px-3 py-1 text-xs rounded-full ${selectedTag === tag ? 'bg-foreground text-background hover:bg-foreground/90' : 'border-border text-muted-foreground hover:text-foreground'}`}
                 onClick={() => { setSelectedTag(tag === selectedTag ? null : tag); setSearchTerm(""); }}
               >
-                {tag}
+                {tag} ({count})
               </Badge>
             ))}
           </div>
