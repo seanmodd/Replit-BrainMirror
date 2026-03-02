@@ -377,7 +377,16 @@ function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; 
 
       <div className="flex gap-3">
         <div className="shrink-0">
-          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm">
+          {tweet.authorProfileImageUrl ? (
+            <img
+              data-testid={`avatar-img-${tweet.id}`}
+              src={tweet.authorProfileImageUrl}
+              alt={displayName}
+              className="w-10 h-10 rounded-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+            />
+          ) : null}
+          <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
             {displayName?.[0]?.toUpperCase() || "?"}
           </div>
         </div>

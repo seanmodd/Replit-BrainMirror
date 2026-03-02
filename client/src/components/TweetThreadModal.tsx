@@ -137,7 +137,16 @@ function ThreadTweetItem({
 
       <div className="flex gap-3">
         <div className="flex flex-col items-center">
-          <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""}`}>
+          {tweet.authorProfileImageUrl ? (
+            <img
+              data-testid={`modal-avatar-img-${tweet.id}`}
+              src={tweet.authorProfileImageUrl}
+              alt={displayName}
+              className={`w-10 h-10 rounded-full object-cover shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""}`}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+            />
+          ) : null}
+          <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm shrink-0 ${isMainTweet ? "ring-2 ring-[#7C3AED]" : ""} ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
             {displayName?.[0]?.toUpperCase() || "?"}
           </div>
           {showConnector && (

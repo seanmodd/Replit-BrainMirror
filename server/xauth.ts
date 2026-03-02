@@ -181,6 +181,7 @@ export interface BookmarkAuthor {
   id: string;
   name: string;
   username: string;
+  profile_image_url?: string;
 }
 
 export interface MediaItem {
@@ -197,7 +198,7 @@ export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; autho
 
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
-    "user.fields": "name,username",
+    "user.fields": "name,username,profile_image_url",
     "media.fields": "url,preview_image_url,type",
     expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
@@ -257,7 +258,7 @@ export function getRedirectUriForDisplay(): string {
 export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any>; media: Map<string, MediaItem> }> {
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
-    "user.fields": "name,username",
+    "user.fields": "name,username,profile_image_url",
     "media.fields": "url,preview_image_url,type",
     expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
@@ -301,7 +302,7 @@ export async function fetchUserTweets(bearerToken: string, userId: string): Prom
 export async function fetchUserLikes(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
   const params = new URLSearchParams({
     "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
-    "user.fields": "name,username",
+    "user.fields": "name,username,profile_image_url",
     expansions: "author_id",
     max_results: "100",
   });

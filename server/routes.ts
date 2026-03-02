@@ -650,6 +650,7 @@ export async function registerRoutes(
             let authorHandle: string;
             let authorName: string;
             let tweetUrl: string;
+            let authorProfileImageUrl: string | null = null;
 
             if (isRetweet && retweetedRef) {
               const originalTweet = refTweetsMap.get(retweetedRef.id);
@@ -658,6 +659,7 @@ export async function registerRoutes(
                 authorHandle = originalAuthor.username;
                 authorName = originalAuthor.name || authorHandle;
                 tweetUrl = `https://x.com/${authorHandle}/status/${retweetedRef.id}`;
+                authorProfileImageUrl = originalAuthor.profile_image_url || null;
               } else {
                 const rtMatch = tw.text?.match(/^RT @([\w]+):/);
                 authorHandle = rtMatch ? rtMatch[1] : (authorMap.get(tw.author_id)?.username || username);
@@ -669,6 +671,7 @@ export async function registerRoutes(
               authorHandle = author?.username || username;
               authorName = author?.name || authorHandle;
               tweetUrl = `https://x.com/${authorHandle}/status/${tw.id}`;
+              authorProfileImageUrl = author?.profile_image_url || null;
             }
 
             const quotedRef = tw.referenced_tweets?.find((r: any) => r.type === "quoted");
@@ -714,6 +717,9 @@ export async function registerRoutes(
                 updates.authorName = authorName;
                 updates.tweetUrl = tweetUrl;
               }
+              if (authorProfileImageUrl && !existing.authorProfileImageUrl) {
+                updates.authorProfileImageUrl = authorProfileImageUrl;
+              }
               if (quotedTweetContent && !existing.quotedTweetContent) {
                 updates.quotedTweetContent = quotedTweetContent;
                 updates.quotedTweetAuthorHandle = quotedTweetAuthorHandle;
@@ -747,6 +753,7 @@ export async function registerRoutes(
               tweetUrl,
               authorHandle,
               authorName,
+              authorProfileImageUrl,
               createdAt: tw.created_at,
               content: tw.text,
               tags,
@@ -813,6 +820,7 @@ export async function registerRoutes(
           const author = authors.get(bm.author_id);
           const authorHandle = author?.username || "unknown";
           const authorName = author?.name || authorHandle;
+          const authorProfileImageUrl = author?.profile_image_url || null;
 
           const quotedRef = bm.referenced_tweets?.find(r => r.type === "quoted");
           const replyToId = bm.referenced_tweets?.find(r => r.type === "replied_to")?.id;
@@ -861,6 +869,9 @@ export async function registerRoutes(
               updates.authorName = authorName;
               updates.tweetUrl = `https://x.com/${authorHandle}/status/${bm.id}`;
             }
+            if (authorProfileImageUrl && !existing.authorProfileImageUrl) {
+              updates.authorProfileImageUrl = authorProfileImageUrl;
+            }
             if (existing.source !== "bookmark") {
               updates.source = "bookmark";
             }
@@ -901,6 +912,7 @@ export async function registerRoutes(
             tweetUrl: `https://x.com/${authorHandle}/status/${bm.id}`,
             authorHandle,
             authorName,
+            authorProfileImageUrl,
             createdAt: bm.created_at,
             content: bm.text,
             tags,

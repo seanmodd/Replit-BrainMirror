@@ -22,6 +22,7 @@ export const tweetNotes = pgTable("tweet_notes", {
   quotedTweetAuthorHandle: text("quoted_tweet_author_handle"),
   quotedTweetAuthorName: text("quoted_tweet_author_name"),
   mediaUrls: text("media_urls").array().notNull().default(sql`'{}'::text[]`),
+  authorProfileImageUrl: text("author_profile_image_url"),
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
 

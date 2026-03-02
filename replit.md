@@ -11,7 +11,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 
 ## Data Model
 
-- `tweet_notes` — Individual tweet bookmarks with metadata (author, content, tags, thread position, links, source, quoted tweet content/author, media URLs)
+- `tweet_notes` — Individual tweet bookmarks with metadata (author, content, tags, thread position, links, source, quoted tweet content/author, media URLs, author profile image URL)
 - `sync_logs` — Track sync operations and their status
 - `settings` — User configuration (poll interval, filename template, etc.)
 

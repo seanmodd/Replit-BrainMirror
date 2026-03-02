@@ -9,6 +9,13 @@ import { useMemo, useState } from "react";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
 
+function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") ||
+    lower.includes("/video/") || lower.includes("video.twimg.com") ||
+    lower.includes("/ext_tw_video/") || lower.includes("/amplify_video/");
+}
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -197,10 +204,22 @@ export default function TimelinePage() {
                           {dayTweets.map((tweet: any) => {
                             const info = getDisplayInfo(tweet);
                             const autoTags = extractAutoTags(tweet);
+                            const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+                            const videoLinks = (tweet.links || []).filter((u: string) => u && u !== "" && isVideoUrl(u));
+                            const allMedia = [...mediaUrls, ...videoLinks.filter((v: string) => !mediaUrls.includes(v))];
                             return (
                               <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onClick={() => setThreadTweet(tweet)}>
                                 <div className="flex gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0">
+                                  {tweet.authorProfileImageUrl ? (
+                                    <img
+                                      data-testid={`avatar-img-${tweet.id}`}
+                                      src={tweet.authorProfileImageUrl}
+                                      alt={info.displayName}
+                                      className="w-8 h-8 rounded-full object-cover shrink-0"
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                                    />
+                                  ) : null}
+                                  <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
                                     {info.displayName?.[0]?.toUpperCase() || "?"}
                                   </div>
                                   <div className="flex-1 min-w-0">
@@ -215,6 +234,34 @@ export default function TimelinePage() {
                                       {tweet.source === "manual" && <Pencil size={12} className="text-muted-foreground shrink-0 ml-0.5" />}
                                     </div>
                                     <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
+                                    {allMedia.length > 0 && (
+                                      <div className={`mt-2 rounded-xl overflow-hidden border border-border ${allMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+                                        {allMedia.map((url: string, i: number) => (
+                                          isVideoUrl(url) ? (
+                                            <div key={i} className={`relative bg-black ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}>
+                                              <video
+                                                data-testid={`timeline-video-${tweet.id}-${i}`}
+                                                src={url}
+                                                controls
+                                                playsInline
+                                                preload="metadata"
+                                                className={`w-full object-cover ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <img
+                                              key={i}
+                                              data-testid={`timeline-img-${tweet.id}-${i}`}
+                                              src={url}
+                                              alt=""
+                                              className={`w-full object-cover ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}
+                                              loading="lazy"
+                                            />
+                                          )
+                                        ))}
+                                      </div>
+                                    )}
                                     {autoTags.length > 0 && (
                                       <div className="flex flex-wrap gap-1 mt-2">
                                         {autoTags.map((tag, i) => (
@@ -226,7 +273,7 @@ export default function TimelinePage() {
                                       </div>
                                     )}
                                     <div className="flex items-center gap-3 mt-2">
-                                      <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-[#1d9bf0] p-1">
+                                      <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-[#1d9bf0] p-1" onClick={(e) => e.stopPropagation()}>
                                         <ExternalLink size={14} />
                                       </a>
                                     </div>

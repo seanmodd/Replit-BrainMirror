@@ -113,7 +113,16 @@ export default function TweetsPage() {
                       </div>
                     )}
                     <div className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0">
+                      {tweet.authorProfileImageUrl ? (
+                        <img
+                          data-testid={`avatar-img-${tweet.id}`}
+                          src={tweet.authorProfileImageUrl}
+                          alt={info.displayName}
+                          className="w-8 h-8 rounded-full object-cover shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
                         {info.displayName?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
