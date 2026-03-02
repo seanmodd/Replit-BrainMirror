@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
-import { Search, ExternalLink, Calendar, Reply, Plus, Trash2, Bookmark, Repeat2, FileText } from "lucide-react";
+import { Search, ExternalLink, Plus, Trash2, Bookmark, Repeat2, FileText, MessageCircle, Heart, BarChart2, Share, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,13 +14,56 @@ import { useToast } from "@/hooks/use-toast";
 
 type SourceTab = "all" | "bookmark" | "retweet" | "public" | "manual";
 
-const SOURCE_TABS: { value: SourceTab; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: "all", label: "All Notes", icon: <FileText size={14} />, description: "Everything in your vault" },
-  { value: "bookmark", label: "Bookmarked", icon: <Bookmark size={14} />, description: "Tweets you bookmarked on X" },
-  { value: "retweet", label: "Retweeted", icon: <Repeat2 size={14} />, description: "Tweets you retweeted" },
-  { value: "public", label: "Public Sync", icon: <FileText size={14} />, description: "Synced from your public timeline" },
-  { value: "manual", label: "Manual", icon: <Plus size={14} />, description: "Manually imported tweets" },
+const SOURCE_TABS: { value: SourceTab; label: string; icon: React.ReactNode }[] = [
+  { value: "all", label: "All Notes", icon: <FileText size={14} /> },
+  { value: "bookmark", label: "Bookmarked", icon: <Bookmark size={14} /> },
+  { value: "retweet", label: "Retweeted", icon: <Repeat2 size={14} /> },
+  { value: "public", label: "Public Sync", icon: <FileText size={14} /> },
+  { value: "manual", label: "Manual", icon: <Plus size={14} /> },
 ];
+
+function formatTimeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatContent(content: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const regex = /(@\w+|#\w+|https?:\/\/\S+)/g;
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("http")) {
+      parts.push(
+        <a key={key++} href={token} target="_blank" rel="noreferrer" className="text-[#1d9bf0] hover:underline">{token}</a>
+      );
+    } else {
+      parts.push(
+        <span key={key++} className="text-[#1d9bf0]">{token}</span>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+  return parts;
+}
 
 export default function BookmarksView() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -73,172 +116,220 @@ export default function BookmarksView() {
   });
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 data-testid="text-bookmarks-title" className="text-3xl font-bold tracking-tight mb-1 text-foreground">Library</h1>
-          <p className="text-muted-foreground">All synced tweets, organized by source.</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-            <Input 
-              data-testid="input-search"
-              placeholder="Search content or author..." 
-              className="pl-9 bg-card border-border focus-visible:ring-primary"
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setSelectedTag(null); }}
-            />
+    <div className="h-full flex flex-col overflow-y-auto">
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-[600px] mx-auto">
+          <div className="flex items-center justify-between px-4 py-3">
+            <h1 data-testid="text-bookmarks-title" className="text-xl font-bold text-foreground">Library</h1>
+            <div className="flex items-center gap-2">
+              <div className="relative w-48">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                <Input
+                  data-testid="input-search"
+                  placeholder="Search..."
+                  className="pl-8 h-8 text-sm bg-muted/50 border-none rounded-full"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setSelectedTag(null); }}
+                />
+              </div>
+              <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
+            </div>
           </div>
-          <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+          <div className="flex border-b border-border">
+            {SOURCE_TABS.map(tab => (
+              <button
+                key={tab.value}
+                data-testid={`tab-source-${tab.value}`}
+                onClick={() => { setActiveTab(tab.value); setSearchTerm(""); setSelectedTag(null); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.value
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                }`}
+              >
+                {tab.label}
+                {sourceCounts[tab.value] > 0 && (
+                  <span className="text-xs text-muted-foreground">({sourceCounts[tab.value]})</span>
+                )}
+                {activeTab === tab.value && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-[#1d9bf0] rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-none pb-1">
-        {SOURCE_TABS.map(tab => (
-          <button
-            key={tab.value}
-            data-testid={`tab-source-${tab.value}`}
-            onClick={() => { setActiveTab(tab.value); setSearchTerm(""); setSelectedTag(null); }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === tab.value 
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              activeTab === tab.value ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
-            }`}>
-              {sourceCounts[tab.value] || 0}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-none">
-        <Badge 
-          variant={selectedTag === null ? "default" : "outline"} 
-          className={`cursor-pointer whitespace-nowrap px-4 py-2 text-xs ${selectedTag === null ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
-          onClick={() => { setSelectedTag(null); setSearchTerm(""); }}
-        >
-          All Topics
-        </Badge>
-        {allTags.map((tag: string) => (
-          <Badge 
-            key={tag}
-            variant={selectedTag === tag ? "default" : "outline"} 
-            className={`cursor-pointer whitespace-nowrap px-4 py-2 text-xs ${selectedTag === tag ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/50'}`}
-            onClick={() => { setSelectedTag(tag === selectedTag ? null : tag); setSearchTerm(""); }}
-          >
-            {tag}
-          </Badge>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-64 w-full rounded-xl" />)}
+      {allTags.length > 0 && (
+        <div className="max-w-[600px] mx-auto w-full border-b border-border">
+          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 scrollbar-none">
+            <Badge
+              variant={selectedTag === null ? "default" : "outline"}
+              className={`cursor-pointer whitespace-nowrap px-3 py-1 text-xs rounded-full ${selectedTag === null ? 'bg-foreground text-background hover:bg-foreground/90' : 'border-border text-muted-foreground hover:text-foreground'}`}
+              onClick={() => { setSelectedTag(null); setSearchTerm(""); }}
+            >
+              All
+            </Badge>
+            {allTags.map((tag: string) => (
+              <Badge
+                key={tag}
+                variant={selectedTag === tag ? "default" : "outline"}
+                className={`cursor-pointer whitespace-nowrap px-3 py-1 text-xs rounded-full ${selectedTag === tag ? 'bg-foreground text-background hover:bg-foreground/90' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                onClick={() => { setSelectedTag(tag === selectedTag ? null : tag); setSearchTerm(""); }}
+              >
+                {tag}
+              </Badge>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10">
-          {tweets.map((tweet: any) => (
-            <TweetCard key={tweet.id} tweet={tweet} onDelete={() => deleteMutation.mutate(tweet.id)} />
-          ))}
-          {tweets.length === 0 && (
-            <div className="col-span-full py-20 text-center text-muted-foreground">
-              <p className="mb-4">
-                {activeTab === "all" 
-                  ? "No tweets found. Import your first tweet to get started."
-                  : `No ${SOURCE_TABS.find(t => t.value === activeTab)?.label.toLowerCase()} tweets found.`
-                }
-              </p>
-              {activeTab === "all" && (
-                <Button variant="outline" onClick={() => setImportOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> Import Tweet
-                </Button>
-              )}
+      )}
+
+      <div className="max-w-[600px] mx-auto w-full">
+        {isLoading ? (
+          <div className="divide-y divide-border">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="p-4 flex gap-3">
+                <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : tweets.length === 0 ? (
+          <div className="py-20 text-center text-muted-foreground px-4">
+            <p className="mb-4 text-[15px]">
+              {activeTab === "all"
+                ? "No tweets yet. Import your first tweet to get started."
+                : `No ${SOURCE_TABS.find(t => t.value === activeTab)?.label.toLowerCase()} tweets found.`
+              }
+            </p>
+            {activeTab === "all" && (
+              <Button variant="outline" className="rounded-full" onClick={() => setImportOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Import Tweet
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {tweets.map((tweet: any) => (
+              <TweetCard key={tweet.id} tweet={tweet} allTweets={tweets} onDelete={() => deleteMutation.mutate(tweet.id)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[]; onDelete: () => void }) {
+  const isRetweet = tweet.source === "retweet";
+  const quotedTweet = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
+
+  return (
+    <article data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer group">
+      {isRetweet && (
+        <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[52px]">
+          <Repeat2 size={14} />
+          <span className="font-bold">You reposted</span>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <div className="shrink-0">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm">
+            {tweet.authorName?.[0]?.toUpperCase() || "?"}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="font-bold text-[15px] text-foreground truncate">{tweet.authorName}</span>
+              <span className="text-muted-foreground text-[15px] truncate">@{tweet.authorHandle}</span>
+              <span className="text-muted-foreground text-[15px] shrink-0">·</span>
+              <span className="text-muted-foreground text-[15px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
+            </div>
+            <div className="flex items-center">
+              <button
+                data-testid={`button-delete-${tweet.id}`}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="p-2 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 size={15} />
+              </button>
+              <a
+                href={tweet.tweetUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors"
+              >
+                <MoreHorizontal size={15} />
+              </a>
+            </div>
+          </div>
+
+          <div className="text-[15px] text-foreground leading-[20px] mt-0.5 whitespace-pre-wrap break-words">
+            {formatContent(tweet.content)}
+          </div>
+
+          {quotedTweet && (
+            <div className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors">
+              <div className="p-3">
+                <div className="flex items-center gap-1 mb-1">
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-[10px]">
+                    {quotedTweet.authorName?.[0]?.toUpperCase() || "?"}
+                  </div>
+                  <span className="font-bold text-[13px] text-foreground">{quotedTweet.authorName}</span>
+                  <span className="text-muted-foreground text-[13px]">@{quotedTweet.authorHandle}</span>
+                  <span className="text-muted-foreground text-[13px]">·</span>
+                  <span className="text-muted-foreground text-[13px]">{formatTimeAgo(quotedTweet.createdAt)}</span>
+                </div>
+                <div className="text-[14px] text-foreground leading-[18px] whitespace-pre-wrap break-words line-clamp-4">
+                  {formatContent(quotedTweet.content)}
+                </div>
+              </div>
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
 
-function SourceBadge({ source }: { source: string }) {
-  const config: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-    bookmark: { label: "Bookmarked", className: "bg-blue-500/10 text-blue-400 border-blue-500/20", icon: <Bookmark size={10} /> },
-    retweet: { label: "Retweeted", className: "bg-amber-500/10 text-amber-400 border-amber-500/20", icon: <Repeat2 size={10} /> },
-    public: { label: "Public", className: "bg-purple-500/10 text-purple-400 border-purple-500/20", icon: <FileText size={10} /> },
-    manual: { label: "Manual", className: "bg-gray-500/10 text-gray-400 border-gray-500/20", icon: <Plus size={10} /> },
-  };
-  const c = config[source] || config.manual;
-  return (
-    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border flex items-center gap-1 ${c.className}`}>
-      {c.icon}
-      {c.label}
-    </span>
-  );
-}
+          {(tweet.tags || []).length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {(tweet.tags || []).map((tag: string) => (
+                <span key={tag} className="text-[13px] text-[#1d9bf0] hover:underline cursor-pointer">
+                  {tag.startsWith("#") ? tag : `#${tag}`}
+                </span>
+              ))}
+            </div>
+          )}
 
-function TweetCard({ tweet, onDelete }: { tweet: any; onDelete: () => void }) {
-  return (
-    <div data-testid={`card-tweet-${tweet.id}`} className="bg-card border border-border rounded-xl p-5 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 group flex flex-col h-full">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-sm">
-            {tweet.authorName?.[0] || "?"}
-          </div>
-          <div>
-            <div className="text-sm font-semibold">{tweet.authorName}</div>
-            <div className="text-xs text-muted-foreground">{tweet.authorHandle}</div>
-          </div>
-        </div>
-        <div className="flex gap-1 items-center">
-          <SourceBadge source={tweet.source || "manual"} />
-          <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-[#1DA1F2] transition-colors bg-muted p-1.5 rounded-md">
-            <ExternalLink size={14} />
-          </a>
-          <button data-testid={`button-delete-${tweet.id}`} onClick={onDelete} className="text-muted-foreground hover:text-destructive transition-colors bg-muted p-1.5 rounded-md opacity-0 group-hover:opacity-100">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-      
-      {tweet.threadPosition && (
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-2 flex items-center gap-1.5">
-          <Reply size={10} className="rotate-180" />
-          Thread {tweet.threadPosition}
-        </div>
-      )}
-      
-      <p className="text-sm text-foreground/90 mb-4 flex-1 whitespace-pre-wrap">
-        {tweet.content}
-      </p>
-      
-      <div className="mt-auto">
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {(tweet.tags || []).map((tag: string) => (
-            <span key={tag} className="text-[11px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex items-center gap-0.5 border border-border/50">
-              {tag}
-            </span>
-          ))}
-        </div>
-        
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-3 border-t border-border/50">
-          <div className="font-mono truncate max-w-[150px]">
-            Twitter - {tweet.authorHandle}
-          </div>
-          <div className="flex items-center gap-1">
-            <Calendar size={10} />
-            <span>{new Date(tweet.createdAt).toLocaleDateString()}</span>
+          <div className="flex items-center justify-between mt-3 max-w-[425px] -ml-2">
+            <button className="flex items-center gap-1 group/action p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors">
+              <MessageCircle size={16} />
+            </button>
+            <button className="flex items-center gap-1 group/action p-2 rounded-full text-muted-foreground hover:text-[#00ba7c] hover:bg-[#00ba7c]/10 transition-colors">
+              <Repeat2 size={16} />
+            </button>
+            <button className="flex items-center gap-1 group/action p-2 rounded-full text-muted-foreground hover:text-[#f91880] hover:bg-[#f91880]/10 transition-colors">
+              <Heart size={16} />
+            </button>
+            <button className="flex items-center gap-1 group/action p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors">
+              <BarChart2 size={16} />
+            </button>
+            <div className="flex items-center">
+              <button className="p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors">
+                <Bookmark size={16} className={tweet.source === "bookmark" ? "fill-[#1d9bf0] text-[#1d9bf0]" : ""} />
+              </button>
+              <button className="p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors">
+                <Share size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -287,8 +378,8 @@ function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button data-testid="button-import-tweet">
-          <Plus className="mr-2 h-4 w-4" /> Import Tweet
+        <Button data-testid="button-import-tweet" size="sm" className="rounded-full h-8 px-4 text-sm">
+          <Plus className="mr-1.5 h-4 w-4" /> Import
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-card border-border">
@@ -318,7 +409,7 @@ function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v:
             <Label htmlFor="tags">Tags (comma separated)</Label>
             <Input data-testid="input-tags" id="tags" placeholder="#ai, #startups, #engineering" value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} />
           </div>
-          <Button data-testid="button-submit-import" type="submit" className="w-full" disabled={createMutation.isPending}>
+          <Button data-testid="button-submit-import" type="submit" className="w-full rounded-full" disabled={createMutation.isPending}>
             {createMutation.isPending ? "Importing..." : "Import Tweet"}
           </Button>
         </form>

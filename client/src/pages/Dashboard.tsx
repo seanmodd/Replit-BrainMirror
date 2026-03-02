@@ -3,10 +3,24 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2 } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+
+function formatTimeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -57,7 +71,7 @@ export default function Dashboard() {
 
   const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending;
 
-  const recentTweets = tweets?.slice(0, 3) || [];
+  const recentTweets = tweets?.slice(0, 5) || [];
 
   return (
     <div className="h-full flex flex-col p-6 max-w-5xl mx-auto gap-6 overflow-y-auto">
@@ -162,56 +176,65 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 overflow-hidden">
           <CardHeader>
-            <CardTitle>Recently Processed Bookmarks</CardTitle>
-            <CardDescription>Latest threads pulled into your vault</CardDescription>
+            <CardTitle>Recent Feed</CardTitle>
+            <CardDescription>Latest tweets pulled into your vault</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {tweetsLoading ? (
-              <div className="space-y-4">
+              <div className="p-6 space-y-4">
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
               </div>
             ) : recentTweets.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <p className="mb-2">No bookmarks imported yet.</p>
+              <div className="py-8 text-center text-muted-foreground px-6">
+                <p className="mb-2">No tweets imported yet.</p>
                 <Link href="/bookmarks">
-                  <Button variant="outline" size="sm">Import Your First Tweet</Button>
+                  <Button variant="outline" size="sm" className="rounded-full">Import Your First Tweet</Button>
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="divide-y divide-border">
                 {recentTweets.map((tweet: any) => (
-                  <div key={tweet.id} data-testid={`card-recent-tweet-${tweet.id}`} className="flex items-start justify-between border-b border-border pb-4 last:border-0 last:pb-0">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{tweet.authorName}</span>
-                        <span className="text-xs text-muted-foreground">{tweet.authorHandle}</span>
-                        <span className="text-xs text-muted-foreground">· {new Date(tweet.createdAt).toLocaleDateString()}</span>
-                        {tweet.source === "bookmark" && (
-                          <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                            <Bookmark size={8} /> Bookmarked
-                          </span>
-                        )}
-                        {tweet.source === "retweet" && (
-                          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                            <Repeat2 size={8} /> Retweeted
-                          </span>
-                        )}
+                  <article key={tweet.id} data-testid={`card-recent-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
+                    {tweet.source === "retweet" && (
+                      <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[44px]">
+                        <Repeat2 size={12} />
+                        <span className="font-bold">You reposted</span>
                       </div>
-                      <p className="text-sm text-foreground/80 line-clamp-2">{tweet.content}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        {(tweet.tags || []).slice(0, 3).map((tag: string) => (
-                          <span key={tag} className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm">
-                            {tag}
+                    )}
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0">
+                        {tweet.authorName?.[0]?.toUpperCase() || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-[14px] text-foreground truncate">{tweet.authorName}</span>
+                          <span className="text-muted-foreground text-[13px] truncate">@{tweet.authorHandle}</span>
+                          <span className="text-muted-foreground text-[13px]">·</span>
+                          <span className="text-muted-foreground text-[13px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
+                          {tweet.source === "bookmark" && (
+                            <Bookmark size={12} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-1" />
+                          )}
+                        </div>
+                        <p className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 line-clamp-3 whitespace-pre-wrap">{tweet.content}</p>
+                        <div className="flex items-center gap-4 mt-2 -ml-2">
+                          <span className="flex items-center gap-1 text-muted-foreground p-1">
+                            <MessageCircle size={14} />
                           </span>
-                        ))}
+                          <span className="flex items-center gap-1 text-muted-foreground p-1">
+                            <Repeat2 size={14} />
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground p-1">
+                            <Heart size={14} />
+                          </span>
+                          <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-[#1d9bf0] p-1 ml-auto">
+                            <ExternalLink size={14} />
+                          </a>
+                        </div>
                       </div>
                     </div>
-                    <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors p-2">
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
