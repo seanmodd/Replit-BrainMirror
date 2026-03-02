@@ -1,13 +1,125 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2, Play } from "lucide-react";
+import { Bookmark, ExternalLink, Globe, Heart, MessageCircle, Pencil, Repeat2, Play, Loader2, Eye, Code } from "lucide-react";
 import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags, getLinkCards } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface TweetThreadModalProps {
   tweet: any;
   allTweets: any[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function XEmbedView({ tweetUrl }: { tweetUrl: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!tweetUrl || !containerRef.current) return;
+
+    setLoading(true);
+    setError(false);
+
+    const container = containerRef.current;
+    container.innerHTML = "";
+
+    const tweetIdMatch = tweetUrl.match(/status\/(\d+)/);
+    if (!tweetIdMatch) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+    const tweetId = tweetIdMatch[1];
+
+    const loadWidget = () => {
+      const win = window as any;
+      if (win.twttr && win.twttr.widgets) {
+        win.twttr.widgets.createTweet(tweetId, container, {
+          theme: "dark",
+          conversation: "all",
+          dnt: true,
+          align: "center",
+          width: 550,
+        }).then((el: any) => {
+          setLoading(false);
+          if (!el) {
+            setError(true);
+          }
+        }).catch(() => {
+          setLoading(false);
+          setError(true);
+        });
+      }
+    };
+
+    const win = window as any;
+    if (win.twttr && win.twttr.widgets) {
+      loadWidget();
+    } else {
+      if (!document.getElementById("twitter-widget-js")) {
+        const script = document.createElement("script");
+        script.id = "twitter-widget-js";
+        script.src = "https://platform.twitter.com/widgets.js";
+        script.async = true;
+        script.onload = () => {
+          setTimeout(loadWidget, 300);
+        };
+        script.onerror = () => {
+          setLoading(false);
+          setError(true);
+        };
+        document.head.appendChild(script);
+      } else {
+        const check = setInterval(() => {
+          if (win.twttr && win.twttr.widgets) {
+            clearInterval(check);
+            loadWidget();
+          }
+        }, 200);
+        setTimeout(() => {
+          clearInterval(check);
+          if (loading) {
+            setLoading(false);
+            setError(true);
+          }
+        }, 10000);
+      }
+    }
+
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
+    };
+  }, [tweetUrl]);
+
+  return (
+    <div className="min-h-[200px]">
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading full thread from X...</p>
+        </div>
+      )}
+      <div ref={containerRef} className="flex justify-center [&>div]:!max-w-full" />
+      {error && !loading && (
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <p className="text-sm text-muted-foreground">Could not load the embedded thread.</p>
+          <a
+            href={tweetUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-[#1d9bf0] hover:underline flex items-center gap-1"
+          >
+            <ExternalLink size={14} />
+            View full thread on X
+          </a>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MediaItemComponent({ url, tweetId, index, single }: { url: string; tweetId: string; index: number; single: boolean }) {
@@ -41,13 +153,14 @@ function MediaItemComponent({ url, tweetId, index, single }: { url: string; twee
 }
 
 export default function TweetThreadModal({ tweet, allTweets, open, onOpenChange }: TweetThreadModalProps) {
+  const [viewMode, setViewMode] = useState<"embed" | "local">("embed");
+
   const threadTweets = useMemo(() => {
     if (!tweet) return [];
     const convId = tweet.conversationId;
     const inThread = allTweets.filter(
       (t: any) => t.conversationId === convId || t.inReplyToTweetId === tweet.tweetId || tweet.inReplyToTweetId === t.tweetId
     );
-    // Use a Set to deduplicate by ID in case conditions overlap
     const uniqueThread = Array.from(new Map(inThread.map(t => [t.id, t])).values());
     uniqueThread.sort(
       (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -55,35 +168,71 @@ export default function TweetThreadModal({ tweet, allTweets, open, onOpenChange 
     return uniqueThread;
   }, [tweet, allTweets]);
 
+  useEffect(() => {
+    if (open) {
+      setViewMode("embed");
+    }
+  }, [open, tweet?.id]);
+
   if (!tweet) return null;
 
-  const hasThread = threadTweets.length > 1;
+  const hasMultipleLocal = threadTweets.length > 1;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="modal-tweet-thread"
-        className="max-w-[600px] max-h-[85vh] overflow-y-auto p-0 gap-0"
+        className="max-w-[650px] max-h-[90vh] overflow-y-auto p-0 gap-0"
         aria-describedby={undefined}
       >
         <DialogHeader className="px-4 pt-4 pb-2 border-b border-border sticky top-0 bg-background z-10">
-          <DialogTitle className="text-lg font-bold">
-            {hasThread ? `Thread (${threadTweets.length} tweets)` : "Tweet"}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-lg font-bold">
+              {viewMode === "embed" ? "Full Thread" : hasMultipleLocal ? `Thread (${threadTweets.length} tweets)` : "Tweet"}
+            </DialogTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                data-testid="button-view-embed"
+                variant={viewMode === "embed" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setViewMode("embed")}
+              >
+                <Eye size={12} />
+                Full Thread
+              </Button>
+              <Button
+                data-testid="button-view-local"
+                variant={viewMode === "local" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setViewMode("local")}
+              >
+                <Code size={12} />
+                Local Data
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="divide-y divide-border">
-          {threadTweets.map((t: any, idx: number) => (
-            <ThreadTweetItem
-              key={t.id}
-              tweet={t}
-              isMainTweet={t.id === tweet.id}
-              isLast={idx === threadTweets.length - 1}
-              showConnector={hasThread && idx < threadTweets.length - 1}
-              allTweets={allTweets}
-            />
-          ))}
-        </div>
+        {viewMode === "embed" ? (
+          <div className="px-2 py-4">
+            <XEmbedView tweetUrl={tweet.tweetUrl} />
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {threadTweets.map((t: any, idx: number) => (
+              <ThreadTweetItem
+                key={t.id}
+                tweet={t}
+                isMainTweet={t.id === tweet.id}
+                isLast={idx === threadTweets.length - 1}
+                showConnector={hasMultipleLocal && idx < threadTweets.length - 1}
+                allTweets={allTweets}
+              />
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
