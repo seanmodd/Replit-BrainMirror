@@ -260,7 +260,7 @@ function extractAutoTags(tweet: any): string[] {
     for (const ht of hashtagMatches) tags.add(ht);
   }
 
-  if (tweet.source) tags.add(`#source/${tweet.source}`);
+  if (tweet.source) tags.add(`#${tweet.source}`);
 
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
   if (mediaUrls.length > 0) tags.add("#has-media");
@@ -268,12 +268,12 @@ function extractAutoTags(tweet: any): string[] {
   if (tweet.inReplyToTweetId) tags.add("#reply");
 
   const topicKeywords: Record<string, string[]> = {
-    "topic/ai": ["AI", "artificial intelligence", "machine learning", "GPT", "LLM", "ChatGPT", "OpenAI"],
-    "topic/crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3"],
-    "topic/programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript"],
-    "topic/startup": ["startup", "founder", "fundraising", "venture capital", "YC"],
-    "topic/design": ["design", "UX", "UI", "Figma"],
-    "topic/productivity": ["productivity", "workflow", "automation"],
+    "ai": ["AI", "artificial intelligence", "machine learning", "GPT", "LLM", "ChatGPT", "OpenAI"],
+    "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3"],
+    "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript"],
+    "startup": ["startup", "founder", "fundraising", "venture capital", "YC"],
+    "design": ["design", "UX", "UI", "Figma"],
+    "productivity": ["productivity", "workflow", "automation"],
   };
 
   const contentLower = (tweet.content || "").toLowerCase();

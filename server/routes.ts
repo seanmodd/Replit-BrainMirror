@@ -46,7 +46,7 @@ function autoGenerateTags(tweet: TweetNote): string[] {
   }
 
   if (tweet.source) {
-    tags.add(`#source/${tweet.source}`);
+    tags.add(`#${tweet.source}`);
   }
 
   const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
@@ -66,20 +66,20 @@ function autoGenerateTags(tweet: TweetNote): string[] {
   const mentionMatches = tweet.content.match(/@(\w+)/g);
   if (mentionMatches) {
     for (const m of mentionMatches) {
-      tags.add(`#mention/${m.slice(1)}`);
+      tags.add(`#${m.slice(1)}`);
     }
   }
 
   const topicKeywords: Record<string, string[]> = {
-    "topic/ai": ["AI", "artificial intelligence", "machine learning", "ML", "GPT", "LLM", "neural network", "deep learning", "ChatGPT", "OpenAI", "AGI"],
-    "topic/crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3", "NFT", "DeFi", "BTC", "ETH"],
-    "topic/programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript", "React", "code", "frontend", "backend", "fullstack"],
-    "topic/startup": ["startup", "founder", "fundraising", "venture capital", "VC", "seed round", "Series A", "YC", "accelerator"],
-    "topic/design": ["design", "UX", "UI", "Figma", "typography", "branding", "CSS"],
-    "topic/productivity": ["productivity", "workflow", "automation", "efficiency", "habit", "routine", "time management"],
-    "topic/marketing": ["marketing", "SEO", "growth", "content marketing", "social media", "branding", "audience"],
-    "topic/finance": ["finance", "investing", "stock", "market", "portfolio", "trading", "economy"],
-    "topic/writing": ["writing", "copywriting", "newsletter", "blogging", "content creation", "storytelling"],
+    "ai": ["AI", "artificial intelligence", "machine learning", "ML", "GPT", "LLM", "neural network", "deep learning", "ChatGPT", "OpenAI", "AGI"],
+    "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3", "NFT", "DeFi", "BTC", "ETH"],
+    "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript", "React", "code", "frontend", "backend", "fullstack"],
+    "startup": ["startup", "founder", "fundraising", "venture capital", "VC", "seed round", "Series A", "YC", "accelerator"],
+    "design": ["design", "UX", "UI", "Figma", "typography", "branding", "CSS"],
+    "productivity": ["productivity", "workflow", "automation", "efficiency", "habit", "routine", "time management"],
+    "marketing": ["marketing", "SEO", "growth", "content marketing", "social media", "branding", "audience"],
+    "finance": ["finance", "investing", "stock", "market", "portfolio", "trading", "economy"],
+    "writing": ["writing", "copywriting", "newsletter", "blogging", "content creation", "storytelling"],
   };
 
   const contentLower = tweet.content.toLowerCase();
