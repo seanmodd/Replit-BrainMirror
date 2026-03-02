@@ -229,7 +229,7 @@ export async function registerRoutes(
         const sourceColor = sourceColorMap[tweet.source] || "#A78BFA";
         nodes.push({
           id: tweet.id,
-          name: `${tweet.authorHandle} - ${tweet.content.substring(0, 30)}...`,
+          name: `${getRealAuthor(tweet).handle} - ${tweet.content.substring(0, 30)}...`,
           val: (tweet.links?.length || 0) + 2,
           group: "Tweet",
           subgroup: tweet.source || "manual",
@@ -295,10 +295,13 @@ export async function registerRoutes(
         const authorHandles = new Set<string>();
         tweetIds.forEach(tid => {
           const tw = tweets.find(t => t.id === tid);
-          if (tw) authorHandles.add(tw.authorHandle);
+          if (tw) authorHandles.add(getRealAuthor(tw).handle);
         });
         authorHandles.forEach(handle => {
-          addLink(tagId, `hub-${handle}`);
+          const key = handle.toLowerCase();
+          if (key !== ownUsername && key !== "unknown") {
+            addLink(tagId, `hub-${handle}`);
+          }
         });
       });
 

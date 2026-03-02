@@ -37,8 +37,8 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `POST /api/tweets` — Import single tweet
 - `POST /api/tweets/bulk` — Bulk import tweets
 - `DELETE /api/tweets/:id` — Delete a tweet
-- `GET /api/stats` — Dashboard statistics
-- `GET /api/graph` — Graph nodes and edges (authors, hashtags, threads, tweets with source-based coloring)
+- `GET /api/stats` — Dashboard statistics (uses `getRealAuthor()` to extract true tweet authors from URL/RT content, filters out own username)
+- `GET /api/graph` — Graph nodes and edges (authors, hashtags, threads, tweets with source-based coloring; uses `getRealAuthor()` for proper author attribution)
 - `GET /api/sync-logs` — Recent sync history
 - `GET /api/settings` — Get current settings
 - `PUT /api/settings` — Update settings
