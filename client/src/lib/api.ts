@@ -58,6 +58,7 @@ export const api = {
     public: (types?: string[]) => fetchJSON<any>("/sync/public", { method: "POST", body: JSON.stringify({ types: types || ["tweets"] }) }),
     bookmarks: () => fetchJSON<any>("/sync/bookmarks", { method: "POST" }),
   },
+  thread: (conversationId: string) => fetchJSON<any>(`/thread/${conversationId}`),
   exportNote: (id: string) => `${API_BASE}/export/${id}`,
   exportAll: () => fetchJSON<any[]>("/export"),
 };

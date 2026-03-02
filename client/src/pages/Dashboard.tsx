@@ -3,12 +3,13 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag, MessageCircle } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo, formatContent, isVideoUrl, proxyImageUrl, getAutoTags, getLinkCards } from "@/lib/utils";
+import { getAutoTags } from "@/lib/utils";
 import TweetThreadModal from "@/components/TweetThreadModal";
+import TweetEmbed from "@/components/TweetEmbed";
 import { useMemo, useState } from "react";
 
 const MONTH_NAMES = [
@@ -433,106 +434,20 @@ export default function Dashboard() {
                       <CardContent className="p-0">
                         <div className="divide-y divide-border">
                           {dayTweets.map((tweet: any) => {
-                            const info = getDisplayInfo(tweet);
                             const autoTags = getAutoTags(tweet);
-                            const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
-                            const videoLinks = (tweet.links || []).filter((u: string) => u && u !== "" && isVideoUrl(u) && !u.includes("x.com/") && !u.includes("twitter.com/"));
-                            const allMedia = [...mediaUrls, ...videoLinks.filter((v: string) => !mediaUrls.includes(v))];
-                            const profileSrc = tweet.authorProfileImageUrl ? proxyImageUrl(tweet.authorProfileImageUrl) : null;
                             return (
-                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onClick={() => setThreadTweet(tweet)}>
-                                <div className="flex gap-3">
-                                  {profileSrc ? (
-                                    <img
-                                      data-testid={`avatar-img-${tweet.id}`}
-                                      src={profileSrc}
-                                      alt={info.displayName}
-                                      className="w-8 h-8 rounded-full object-cover shrink-0"
-                                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
-                                    />
-                                  ) : null}
-                                  <div className={`w-8 h-8 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-xs shrink-0 ${profileSrc ? 'hidden' : ''}`}>
-                                    {info.displayName?.[0]?.toUpperCase() || "?"}
+                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="py-2 cursor-pointer" onClick={() => setThreadTweet(tweet)}>
+                                <TweetEmbed tweetUrl={tweet.tweetUrl} tweetId={tweet.id} />
+                                {autoTags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 px-4 pb-2">
+                                    {autoTags.map((tag, i) => (
+                                      <span key={i} data-testid={`tag-${tag}`} className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                        <Tag size={8} />
+                                        {tag}
+                                      </span>
+                                    ))}
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1">
-                                      <span className="font-bold text-[14px] text-foreground truncate">{info.displayName}</span>
-                                      <span className="text-muted-foreground text-[13px] truncate">@{info.displayHandle}</span>
-                                      <span className="text-muted-foreground text-[13px]">·</span>
-                                      <span className="text-muted-foreground text-[13px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
-                                      {tweet.source === "bookmark" && <Bookmark size={12} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-0.5" />}
-                                      {tweet.source === "retweet" && <Repeat2 size={12} className="text-[#00ba7c] shrink-0 ml-0.5" />}
-                                      {tweet.source === "public" && <Globe size={12} className="text-[#A78BFA] shrink-0 ml-0.5" />}
-                                      {tweet.source === "manual" && <Pencil size={12} className="text-muted-foreground shrink-0 ml-0.5" />}
-                                    </div>
-                                    <div className="text-[14px] text-foreground/90 leading-[20px] mt-0.5 whitespace-pre-wrap break-words">{formatContent(info.displayContent)}</div>
-                                    {(() => {
-                                      const threadCount = (tweets || []).filter((t: any) => t.conversationId === tweet.conversationId).length;
-                                      return threadCount > 1 ? (
-                                        <div data-testid={`thread-indicator-${tweet.id}`} className="flex items-center gap-1 mt-1.5 text-[12px] text-[#7C3AED] font-medium">
-                                          <MessageCircle size={12} />
-                                          <span>Thread ({threadCount} tweets)</span>
-                                        </div>
-                                      ) : null;
-                                    })()}
-                                    {allMedia.length > 0 && (
-                                      <div className={`mt-2 rounded-xl overflow-hidden border border-border ${allMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
-                                        {allMedia.map((url: string, i: number) => (
-                                          isVideoUrl(url) ? (
-                                            <div key={i} className={`relative bg-black ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}>
-                                              <video
-                                                data-testid={`timeline-video-${tweet.id}-${i}`}
-                                                src={proxyImageUrl(url)}
-                                                controls
-                                                playsInline
-                                                preload="metadata"
-                                                className={`w-full object-cover ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}
-                                                onClick={(e) => e.stopPropagation()}
-                                              />
-                                            </div>
-                                          ) : (
-                                            <img
-                                              key={i}
-                                              data-testid={`timeline-img-${tweet.id}-${i}`}
-                                              src={proxyImageUrl(url)}
-                                              alt=""
-                                              className={`w-full object-cover ${allMedia.length === 1 ? "max-h-[280px]" : "h-[140px]"}`}
-                                              loading="lazy"
-                                            />
-                                          )
-                                        ))}
-                                      </div>
-                                    )}
-                                    {(() => {
-                                      const cards = getLinkCards(tweet);
-                                      return cards.length > 0 && allMedia.length === 0 ? (
-                                        <a href={cards[0].url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-2 border border-border rounded-xl overflow-hidden hover:bg-foreground/[0.03] transition-colors block">
-                                          {cards[0].image && <img src={proxyImageUrl(cards[0].image)} alt="" className="w-full h-[140px] object-cover border-b border-border" loading="lazy" />}
-                                          <div className="px-3 py-2">
-                                            {cards[0].displayUrl && <div className="text-[12px] text-muted-foreground truncate">{cards[0].displayUrl}</div>}
-                                            {cards[0].title && <div className="text-[13px] text-foreground leading-[16px] truncate">{cards[0].title}</div>}
-                                            {cards[0].description && <div className="text-[12px] text-muted-foreground leading-[14px] line-clamp-2 mt-0.5">{cards[0].description}</div>}
-                                          </div>
-                                        </a>
-                                      ) : null;
-                                    })()}
-                                    {autoTags.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-2">
-                                        {autoTags.map((tag, i) => (
-                                          <span key={i} data-testid={`tag-${tag}`} className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                                            <Tag size={8} />
-                                            {tag}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    <div className="flex items-center gap-3 mt-2">
-                                      <a href={tweet.tweetUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-[#1d9bf0] p-1" onClick={(e) => e.stopPropagation()}>
-                                        <ExternalLink size={14} />
-                                      </a>
-                                    </div>
-                                  </div>
-                                </div>
+                                )}
                               </article>
                             );
                           })}

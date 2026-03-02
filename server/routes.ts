@@ -1183,6 +1183,178 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Fetch Full Thread from X API ────────────────────────
+
+  app.get("/api/thread/:conversationId", async (req, res) => {
+    try {
+      const bearerToken = process.env.X_BEARER_TOKEN;
+      if (!bearerToken) {
+        return res.status(401).json({ message: "No bearer token configured" });
+      }
+
+      const conversationId = req.params.conversationId;
+      const params = new URLSearchParams({
+        query: `conversation_id:${conversationId}`,
+        "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
+        "user.fields": "name,username,profile_image_url",
+        "media.fields": "url,preview_image_url,type,variants",
+        expansions: "author_id,attachments.media_keys,referenced_tweets.id",
+        max_results: "100",
+      });
+
+      const searchResponse = await fetch(
+        `https://api.x.com/2/tweets/search/recent?${params.toString()}`,
+        { headers: { Authorization: `Bearer ${bearerToken}` } }
+      );
+
+      const rootParams = new URLSearchParams({
+        "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
+        "user.fields": "name,username,profile_image_url",
+        "media.fields": "url,preview_image_url,type,variants",
+        expansions: "author_id,attachments.media_keys",
+      });
+
+      const rootResponse = await fetch(
+        `https://api.x.com/2/tweets/${conversationId}?${rootParams.toString()}`,
+        { headers: { Authorization: `Bearer ${bearerToken}` } }
+      );
+
+      const threadTweets: any[] = [];
+      const authorMap = new Map<string, any>();
+      const mediaMap = new Map<string, any>();
+      const refTweetMap = new Map<string, any>();
+      let xApiFailed = !rootResponse.ok && !searchResponse.ok;
+
+      if (rootResponse.ok) {
+        const rootData = await rootResponse.json();
+        if (rootData.data) {
+          threadTweets.push(rootData.data);
+        }
+        if (rootData.includes?.users) {
+          for (const u of rootData.includes.users) authorMap.set(u.id, u);
+        }
+        if (rootData.includes?.media) {
+          for (const m of rootData.includes.media) mediaMap.set(m.media_key, m);
+        }
+        if (rootData.includes?.tweets) {
+          for (const rt of rootData.includes.tweets) refTweetMap.set(rt.id, rt);
+        }
+      }
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        if (searchData.data) {
+          for (const tw of searchData.data) {
+            if (!threadTweets.find(t => t.id === tw.id)) {
+              threadTweets.push(tw);
+            }
+          }
+        }
+        if (searchData.includes?.users) {
+          for (const u of searchData.includes.users) authorMap.set(u.id, u);
+        }
+        if (searchData.includes?.media) {
+          for (const m of searchData.includes.media) mediaMap.set(m.media_key, m);
+        }
+        if (searchData.includes?.tweets) {
+          for (const rt of searchData.includes.tweets) refTweetMap.set(rt.id, rt);
+        }
+      }
+
+      const localTweets = await storage.getAllTweetNotes();
+      const localInThread = localTweets.filter(t => t.conversationId === conversationId);
+      for (const lt of localInThread) {
+        if (!threadTweets.find(t => t.id === lt.tweetId)) {
+          threadTweets.push({
+            id: lt.tweetId,
+            text: lt.content,
+            author_id: lt.authorHandle,
+            created_at: lt.createdAt,
+            conversation_id: lt.conversationId,
+            _local: true,
+            _authorName: lt.authorName,
+            _authorHandle: lt.authorHandle,
+            _authorProfileImageUrl: lt.authorProfileImageUrl,
+            _mediaUrls: lt.mediaUrls,
+            _quotedTweetContent: lt.quotedTweetContent,
+            _quotedTweetAuthorHandle: lt.quotedTweetAuthorHandle,
+            _quotedTweetAuthorName: lt.quotedTweetAuthorName,
+          });
+        }
+      }
+
+      threadTweets.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      const enriched = threadTweets.map(tw => {
+        if (tw._local) {
+          return {
+            id: tw.id,
+            text: tw.text,
+            authorName: tw._authorName,
+            authorHandle: tw._authorHandle,
+            authorProfileImageUrl: tw._authorProfileImageUrl,
+            createdAt: tw.created_at,
+            mediaUrls: (tw._mediaUrls || []).filter((u: string) => u && u !== ""),
+            quotedTweetContent: tw._quotedTweetContent,
+            quotedTweetAuthorHandle: tw._quotedTweetAuthorHandle,
+            quotedTweetAuthorName: tw._quotedTweetAuthorName,
+          };
+        }
+
+        const author = authorMap.get(tw.author_id);
+        const tweetMediaUrls: string[] = [];
+        if (tw.attachments?.media_keys) {
+          for (const mk of tw.attachments.media_keys) {
+            const m = mediaMap.get(mk);
+            if (m) {
+              tweetMediaUrls.push(getBestMediaUrl(m));
+            }
+          }
+        }
+
+        let quotedTweetContent = null;
+        let quotedTweetAuthorHandle = null;
+        let quotedTweetAuthorName = null;
+        const quotedRef = tw.referenced_tweets?.find((r: any) => r.type === "quoted");
+        if (quotedRef) {
+          const qt = refTweetMap.get(quotedRef.id);
+          if (qt) {
+            const qtAuthor = authorMap.get(qt.author_id);
+            quotedTweetContent = qt.text;
+            quotedTweetAuthorHandle = qtAuthor?.username || qt.author_id;
+            quotedTweetAuthorName = qtAuthor?.name || qt.author_id;
+          }
+        }
+
+        return {
+          id: tw.id,
+          text: tw.text,
+          authorName: author?.name || tw.author_id,
+          authorHandle: author?.username || tw.author_id,
+          authorProfileImageUrl: author?.profile_image_url?.replace("_normal", "_bigger") || null,
+          createdAt: tw.created_at,
+          mediaUrls: tweetMediaUrls,
+          quotedTweetContent,
+          quotedTweetAuthorHandle,
+          quotedTweetAuthorName,
+        };
+      });
+
+      if (xApiFailed && enriched.length === 0) {
+        return res.status(502).json({ message: "Could not fetch thread from X API and no local data available" });
+      }
+
+      res.json({
+        conversationId,
+        tweets: enriched,
+        total: enriched.length,
+      });
+    } catch (err: any) {
+      console.error("Thread fetch error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── Enrich Profile Images ────────────────────────────────
 
   app.post("/api/tweets/enrich-profiles", async (req, res) => {
