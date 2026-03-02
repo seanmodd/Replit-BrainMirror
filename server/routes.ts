@@ -48,7 +48,7 @@ export async function registerRoutes(
 
   app.get("/api/tweets", async (req, res) => {
     try {
-      const { search, tag } = req.query;
+      const { search, tag, source } = req.query;
       let tweets;
       if (search && typeof search === "string") {
         tweets = await storage.searchTweetNotes(search);
@@ -56,6 +56,9 @@ export async function registerRoutes(
         tweets = await storage.filterTweetNotesByTag(tag);
       } else {
         tweets = await storage.getAllTweetNotes();
+      }
+      if (source && typeof source === "string") {
+        tweets = tweets.filter(t => t.source === source);
       }
       res.json(tweets);
     } catch (err: any) {
@@ -159,38 +162,105 @@ export async function registerRoutes(
 
       const nodes: any[] = [];
       const links: any[] = [];
+      const linkSet = new Set<string>();
+
+      const addLink = (source: string, target: string) => {
+        const key = [source, target].sort().join("__");
+        if (!linkSet.has(key)) {
+          linkSet.add(key);
+          links.push({ source, target });
+        }
+      };
+
+      const tagTweetMap = new Map<string, string[]>();
+      const conversationMap = new Map<string, string[]>();
 
       tweets.forEach(tweet => {
+        const sourceColorMap: Record<string, string> = { bookmark: "#3B82F6", retweet: "#F59E0B", public: "#A78BFA", manual: "#8B5CF6" };
+        const sourceColor = sourceColorMap[tweet.source] || "#A78BFA";
         nodes.push({
           id: tweet.id,
           name: `${tweet.authorHandle} - ${tweet.content.substring(0, 30)}...`,
           val: (tweet.links?.length || 0) + 2,
           group: "Tweet",
-          color: "#A78BFA",
+          subgroup: tweet.source || "manual",
+          color: sourceColor,
         });
 
         (tweet.links || []).forEach(targetId => {
-          if (
-            tweets.some(t => t.id === targetId) &&
-            !links.some(l => (l.source === tweet.id && l.target === targetId) || (l.source === targetId && l.target === tweet.id))
-          ) {
-            links.push({ source: tweet.id, target: targetId });
+          if (tweets.some(t => t.id === targetId)) {
+            addLink(tweet.id, targetId);
           }
         });
+
+        if (tweet.quotedTweetId) {
+          const quoted = tweets.find(t => t.tweetId === tweet.quotedTweetId);
+          if (quoted) addLink(tweet.id, quoted.id);
+        }
+        if (tweet.inReplyToTweetId) {
+          const parent = tweets.find(t => t.tweetId === tweet.inReplyToTweetId);
+          if (parent) addLink(tweet.id, parent.id);
+        }
+
+        (tweet.tags || []).forEach(tag => {
+          if (!tagTweetMap.has(tag)) tagTweetMap.set(tag, []);
+          tagTweetMap.get(tag)!.push(tweet.id);
+        });
+
+        const convId = tweet.conversationId;
+        if (convId) {
+          if (!conversationMap.has(convId)) conversationMap.set(convId, []);
+          conversationMap.get(convId)!.push(tweet.id);
+        }
       });
 
       authors.forEach(author => {
         const hubId = `hub-${author.handle}`;
         nodes.push({
           id: hubId,
-          name: `Twitter - ${author.handle}.md`,
+          name: `@${author.handle}`,
           val: author.count * 2 + 5,
           group: "Author",
           color: "#7C3AED",
         });
         tweets.filter(t => t.authorHandle === author.handle).forEach(t => {
-          links.push({ source: hubId, target: t.id });
+          addLink(hubId, t.id);
         });
+      });
+
+      tagTweetMap.forEach((tweetIds, tag) => {
+        if (tweetIds.length < 1) return;
+        const tagId = `tag-${tag}`;
+        nodes.push({
+          id: tagId,
+          name: tag,
+          val: tweetIds.length + 3,
+          group: "Hashtag",
+          color: "#10B981",
+        });
+        tweetIds.forEach(tid => addLink(tagId, tid));
+
+        const authorHandles = new Set<string>();
+        tweetIds.forEach(tid => {
+          const tw = tweets.find(t => t.id === tid);
+          if (tw) authorHandles.add(tw.authorHandle);
+        });
+        authorHandles.forEach(handle => {
+          addLink(tagId, `hub-${handle}`);
+        });
+      });
+
+      conversationMap.forEach((tweetIds, convId) => {
+        if (tweetIds.length < 2) return;
+        const threadId = `thread-${convId}`;
+        nodes.push({
+          id: threadId,
+          name: `Thread`,
+          val: tweetIds.length + 2,
+          group: "Thread",
+          color: "#F97316",
+        });
+        tweetIds.forEach(tid => addLink(threadId, tid));
       });
 
       res.json({ nodes, links });
@@ -408,6 +478,7 @@ export async function registerRoutes(
             const replyToId = tw.referenced_tweets?.find((r: any) => r.type === "replied_to")?.id;
             const quotedId = tw.referenced_tweets?.find((r: any) => r.type === "quoted")?.id;
 
+            const isRetweet = tw.referenced_tweets?.some((r: any) => r.type === "retweeted");
             await storage.createTweetNote({
               tweetId: tw.id,
               conversationId: tw.conversation_id || tw.id,
@@ -421,6 +492,7 @@ export async function registerRoutes(
               quotedTweetId: quotedId || null,
               inReplyToTweetId: replyToId || null,
               links,
+              source: isRetweet ? "retweet" : "public",
             });
             imported++;
           }
@@ -511,6 +583,7 @@ export async function registerRoutes(
             quotedTweetId: quotedId || null,
             inReplyToTweetId: replyToId || null,
             links,
+            source: "bookmark",
           });
           imported++;
         }

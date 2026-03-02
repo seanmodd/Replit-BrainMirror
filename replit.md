@@ -11,7 +11,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 
 ## Data Model
 
-- `tweet_notes` — Individual tweet bookmarks with metadata (author, content, tags, thread position, links)
+- `tweet_notes` — Individual tweet bookmarks with metadata (author, content, tags, thread position, links, source)
 - `sync_logs` — Track sync operations and their status
 - `settings` — User configuration (poll interval, filename template, etc.)
 
@@ -29,12 +29,12 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 
 ## API Endpoints
 
-- `GET /api/tweets` — List all tweets (supports `?search=` and `?tag=` query params)
+- `GET /api/tweets` — List all tweets (supports `?search=`, `?tag=`, and `?source=` query params)
 - `POST /api/tweets` — Import single tweet
 - `POST /api/tweets/bulk` — Bulk import tweets
 - `DELETE /api/tweets/:id` — Delete a tweet
 - `GET /api/stats` — Dashboard statistics
-- `GET /api/graph` — Graph nodes and edges for visualization
+- `GET /api/graph` — Graph nodes and edges (authors, hashtags, threads, tweets with source-based coloring)
 - `GET /api/sync-logs` — Recent sync history
 - `GET /api/settings` — Get current settings
 - `PUT /api/settings` — Update settings

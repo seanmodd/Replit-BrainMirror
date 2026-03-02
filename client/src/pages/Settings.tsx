@@ -322,7 +322,7 @@ function XAccountCard() {
                 variant="outline"
                 size="sm"
                 onClick={() => publicSyncMutation.mutate()}
-                disabled={publicSyncMutation.isPending || (!syncTweets && !syncLikes)}
+                disabled={publicSyncMutation.isPending || !syncTweets}
               >
                 {publicSyncMutation.isPending ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing...</>

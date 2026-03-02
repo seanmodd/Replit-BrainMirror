@@ -17,6 +17,7 @@ export const tweetNotes = pgTable("tweet_notes", {
   quotedTweetId: text("quoted_tweet_id"),
   inReplyToTweetId: text("in_reply_to_tweet_id"),
   links: text("links").array().notNull().default(sql`'{}'::text[]`),
+  source: text("source").notNull().default("manual"),
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
 

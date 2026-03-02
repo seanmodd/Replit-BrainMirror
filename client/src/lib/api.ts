@@ -20,10 +20,11 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   tweets: {
-    list: (params?: { search?: string; tag?: string }) => {
+    list: (params?: { search?: string; tag?: string; source?: string }) => {
       const qs = new URLSearchParams();
       if (params?.search) qs.set("search", params.search);
       if (params?.tag) qs.set("tag", params.tag);
+      if (params?.source) qs.set("source", params.source);
       const query = qs.toString();
       return fetchJSON<any[]>(`/tweets${query ? `?${query}` : ""}`);
     },

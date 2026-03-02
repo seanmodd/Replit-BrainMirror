@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2 } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -188,6 +188,16 @@ export default function Dashboard() {
                         <span className="text-sm font-medium">{tweet.authorName}</span>
                         <span className="text-xs text-muted-foreground">{tweet.authorHandle}</span>
                         <span className="text-xs text-muted-foreground">· {new Date(tweet.createdAt).toLocaleDateString()}</span>
+                        {tweet.source === "bookmark" && (
+                          <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Bookmark size={8} /> Bookmarked
+                          </span>
+                        )}
+                        {tweet.source === "retweet" && (
+                          <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Repeat2 size={8} /> Retweeted
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-foreground/80 line-clamp-2">{tweet.content}</p>
                       <div className="flex items-center gap-2 mt-2">
