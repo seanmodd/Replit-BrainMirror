@@ -22,7 +22,7 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - `server/storage.ts` — Storage interface (DatabaseStorage class with CRUD operations)
 - `server/routes.ts` — API routes prefixed with `/api`
 - `client/src/lib/api.ts` — Frontend API client
-- `client/src/pages/Dashboard.tsx` — Overview with clickable stat cards
+- `client/src/pages/Dashboard.tsx` — Overview with stat cards + full timeline view (date-grouped tweets with year/month filters)
 - `client/src/pages/TweetsPage.tsx` — All tweets view with search/filter
 - `client/src/pages/AuthorsPage.tsx` — All authors grid view
 - `client/src/pages/FilesPage.tsx` — Markdown files listing (author hubs + tweet notes)
