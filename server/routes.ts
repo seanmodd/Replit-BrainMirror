@@ -459,9 +459,6 @@ export async function registerRoutes(
           let imported = 0;
           let skipped = 0;
           for (const tw of tweetList) {
-            const existing = await storage.getTweetNoteByTweetId(tw.id);
-            if (existing) { skipped++; continue; }
-
             const isRetweet = tw.referenced_tweets?.some((r: any) => r.type === "retweeted");
             const retweetedRef = tw.referenced_tweets?.find((r: any) => r.type === "retweeted");
 
@@ -487,6 +484,20 @@ export async function registerRoutes(
               authorHandle = author?.username || username;
               authorName = author?.name || authorHandle;
               tweetUrl = `https://x.com/${authorHandle}/status/${tw.id}`;
+            }
+
+            const existing = await storage.getTweetNoteByTweetId(tw.id);
+            if (existing) {
+              const needsAuthorUpdate = existing.authorHandle !== authorHandle && authorHandle !== "unknown" && authorHandle !== username;
+              if (needsAuthorUpdate) {
+                await storage.updateTweetNote(existing.id, {
+                  authorHandle,
+                  authorName,
+                  tweetUrl,
+                });
+              }
+              skipped++;
+              continue;
             }
 
             const tags: string[] = [];
@@ -563,17 +574,33 @@ export async function registerRoutes(
 
         let imported = 0;
         let skipped = 0;
+        let updated = 0;
 
         for (const bm of bookmarks) {
           const existing = await storage.getTweetNoteByTweetId(bm.id);
-          if (existing) {
-            skipped++;
-            continue;
-          }
-
           const author = authors.get(bm.author_id);
           const authorHandle = author?.username || "unknown";
           const authorName = author?.name || authorHandle;
+
+          if (existing) {
+            const needsAuthorUpdate = existing.authorHandle !== authorHandle && authorHandle !== "unknown";
+            const needsSourceUpdate = existing.source !== "bookmark";
+            if (needsAuthorUpdate || needsSourceUpdate) {
+              const updates: any = {};
+              if (needsAuthorUpdate) {
+                updates.authorHandle = authorHandle;
+                updates.authorName = authorName;
+                updates.tweetUrl = `https://x.com/${authorHandle}/status/${bm.id}`;
+              }
+              if (needsSourceUpdate) {
+                updates.source = "bookmark";
+              }
+              await storage.updateTweetNote(existing.id, updates);
+              updated++;
+            }
+            skipped++;
+            continue;
+          }
 
           const tags: string[] = [];
           if (bm.entities?.hashtags) {
@@ -616,7 +643,7 @@ export async function registerRoutes(
           completedAt: new Date(),
         });
 
-        res.json({ imported, skipped, total: bookmarks.length });
+        res.json({ imported, skipped, updated, total: bookmarks.length });
       } catch (err: any) {
         await storage.updateSyncLog(syncLog.id, {
           status: "error",

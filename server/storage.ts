@@ -14,6 +14,7 @@ export interface IStorage {
   searchTweetNotes(query: string): Promise<TweetNote[]>;
   filterTweetNotesByTag(tag: string): Promise<TweetNote[]>;
   createTweetNote(note: InsertTweetNote): Promise<TweetNote>;
+  updateTweetNote(id: string, updates: Partial<InsertTweetNote>): Promise<TweetNote | undefined>;
   deleteTweetNote(id: string): Promise<void>;
   getTweetNoteCount(): Promise<number>;
   getUniqueTags(): Promise<string[]>;
@@ -64,6 +65,11 @@ export class DatabaseStorage implements IStorage {
   async createTweetNote(note: InsertTweetNote): Promise<TweetNote> {
     const [created] = await db.insert(tweetNotes).values(note).returning();
     return created;
+  }
+
+  async updateTweetNote(id: string, updates: Partial<InsertTweetNote>): Promise<TweetNote | undefined> {
+    const [updated] = await db.update(tweetNotes).set(updates).where(eq(tweetNotes.id, id)).returning();
+    return updated;
   }
 
   async deleteTweetNote(id: string): Promise<void> {
