@@ -7,7 +7,7 @@ import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookm
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -206,7 +206,7 @@ export default function Dashboard() {
                               <Bookmark size={12} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-1" />
                             )}
                           </div>
-                          <p className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 line-clamp-3 whitespace-pre-wrap">{info.displayContent}</p>
+                          <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 line-clamp-3 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
                           <div className="flex items-center gap-4 mt-2 -ml-2">
                             <span className="flex items-center gap-1 text-muted-foreground p-1">
                               <MessageCircle size={14} />

@@ -1,3 +1,4 @@
+import React from "react"
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -29,6 +30,35 @@ export function getDisplayInfo(tweet: any): {
     displayContent: tweet.content,
     isRetweet: tweet.source === "retweet",
   };
+}
+
+export function formatContent(content: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const regex = /(@\w+|#\w+|https?:\/\/\S+)/g;
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("http")) {
+      parts.push(
+        React.createElement("a", { key: key++, href: token, target: "_blank", rel: "noreferrer", className: "text-[#1d9bf0] hover:underline" }, token)
+      );
+    } else {
+      parts.push(
+        React.createElement("span", { key: key++, className: "text-[#1d9bf0]" }, token)
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+  return parts;
 }
 
 export function formatTimeAgo(dateStr: string): string {

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getDisplayInfo, formatTimeAgo } from "@/lib/utils";
+import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
 
 type SourceTab = "all" | "bookmark" | "retweet" | "public" | "manual";
 type SortOption = "newest" | "oldest" | "author-az" | "author-za";
@@ -30,35 +30,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "author-az", label: "Author A-Z" },
   { value: "author-za", label: "Author Z-A" },
 ];
-
-function formatContent(content: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const regex = /(@\w+|#\w+|https?:\/\/\S+)/g;
-  let lastIndex = 0;
-  let match;
-  let key = 0;
-
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(content.slice(lastIndex, match.index));
-    }
-    const token = match[0];
-    if (token.startsWith("http")) {
-      parts.push(
-        <a key={key++} href={token} target="_blank" rel="noreferrer" className="text-[#1d9bf0] hover:underline">{token}</a>
-      );
-    } else {
-      parts.push(
-        <span key={key++} className="text-[#1d9bf0]">{token}</span>
-      );
-    }
-    lastIndex = regex.lastIndex;
-  }
-  if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex));
-  }
-  return parts;
-}
 
 export default function BookmarksView() {
   const [searchTerm, setSearchTerm] = useState("");
