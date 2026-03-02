@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -465,7 +465,16 @@ export default function Dashboard() {
                                       {tweet.source === "public" && <Globe size={12} className="text-[#A78BFA] shrink-0 ml-0.5" />}
                                       {tweet.source === "manual" && <Pencil size={12} className="text-muted-foreground shrink-0 ml-0.5" />}
                                     </div>
-                                    <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
+                                    <div className="text-[14px] text-foreground/90 leading-[20px] mt-0.5 whitespace-pre-wrap break-words">{formatContent(info.displayContent)}</div>
+                                    {(() => {
+                                      const threadCount = (tweets || []).filter((t: any) => t.conversationId === tweet.conversationId).length;
+                                      return threadCount > 1 ? (
+                                        <div data-testid={`thread-indicator-${tweet.id}`} className="flex items-center gap-1 mt-1.5 text-[12px] text-[#7C3AED] font-medium">
+                                          <MessageCircle size={12} />
+                                          <span>Thread ({threadCount} tweets)</span>
+                                        </div>
+                                      ) : null;
+                                    })()}
                                     {allMedia.length > 0 && (
                                       <div className={`mt-2 rounded-xl overflow-hidden border border-border ${allMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
                                         {allMedia.map((url: string, i: number) => (

@@ -136,7 +136,39 @@ function getDateParts(dateStr: string): { year: string; month: string; monthName
   return { year, month, monthName, day, dateIso };
 }
 
-function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
+function renderSingleTweetBody(tweet: TweetNote): string[] {
+  const lines: string[] = [];
+
+  const body = tweet.content
+    .replace(/@(\w+)/g, "[[@$1]]")
+    .replace(/#(\w+)/g, "[[#$1]]");
+
+  lines.push(body);
+
+  const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
+  if (mediaUrls.length > 0) {
+    lines.push("");
+    lines.push("**Media:**");
+    mediaUrls.forEach((url, i) => {
+      lines.push(`![Tweet media ${i + 1}](${url})`);
+    });
+  }
+
+  if (tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle) {
+    lines.push("");
+    lines.push("**Quoted Tweet:**");
+    lines.push(`> **${tweet.quotedTweetAuthorName || tweet.quotedTweetAuthorHandle}** (@${tweet.quotedTweetAuthorHandle})`);
+    lines.push(">");
+    const quotedLines = tweet.quotedTweetContent.split("\n");
+    quotedLines.forEach(line => {
+      lines.push(`> ${line}`);
+    });
+  }
+
+  return lines;
+}
+
+function generateMarkdown(tweet: TweetNote, filenameTemplate: string, allTweets?: TweetNote[]) {
   const { year, month, monthName, day, dateIso } = getDateParts(tweet.createdAt);
   const contentTrunc = tweet.content.substring(0, 40).replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const filename = filenameTemplate
@@ -149,6 +181,13 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const folderPath = `${year}/${month}-${monthName}/${day}`;
 
   const allTags = autoGenerateTags(tweet);
+
+  const threadTweets = allTweets
+    ? allTweets
+        .filter(t => t.conversationId === tweet.conversationId)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    : [];
+  const isThread = threadTweets.length > 1;
 
   const frontmatter = [
     "---",
@@ -168,32 +207,84 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
     tweet.quotedTweetId ? `quoted_tweet_id: ${tweet.quotedTweetId}` : null,
     tweet.inReplyToTweetId ? `in_reply_to_tweet_id: ${tweet.inReplyToTweetId}` : null,
     (tweet.mediaUrls || []).filter(u => u).length > 0 ? `media_count: ${tweet.mediaUrls!.filter(u => u).length}` : null,
+    isThread ? `thread_length: ${threadTweets.length}` : null,
     "---",
   ].filter(Boolean).join("\n");
 
-  const body = tweet.content
-    .replace(/@(\w+)/g, "[[@$1]]")
-    .replace(/#(\w+)/g, "[[#$1]]");
+  const sections: string[] = [frontmatter, ""];
 
-  const sections: string[] = [frontmatter, "", body];
+  const mainBody = renderSingleTweetBody(tweet);
+  sections.push(...mainBody);
 
-  const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
-  if (mediaUrls.length > 0) {
+  if (isThread) {
     sections.push("");
-    sections.push("## Media");
-    mediaUrls.forEach((url, i) => {
-      sections.push(`![Tweet media ${i + 1}](${url})`);
-    });
-  }
-
-  if (tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle) {
+    sections.push("---");
     sections.push("");
-    sections.push("## Quoted Tweet");
-    sections.push(`> **${tweet.quotedTweetAuthorName || tweet.quotedTweetAuthorHandle}** (@${tweet.quotedTweetAuthorHandle})`);
-    sections.push(">");
-    const quotedLines = tweet.quotedTweetContent.split("\n");
-    quotedLines.forEach(line => {
-      sections.push(`> ${line}`);
+    sections.push(`## Full Thread (${threadTweets.length} tweets)`);
+    sections.push("");
+
+    threadTweets.forEach((t, idx) => {
+      const isCurrentTweet = t.tweetId === tweet.tweetId;
+      const tweetDate = getDateParts(t.createdAt).dateIso;
+      const tweetBody = t.content
+        .replace(/@(\w+)/g, "[[@$1]]")
+        .replace(/#(\w+)/g, "[[#$1]]");
+
+      const headerLabel = isCurrentTweet
+        ? `${idx + 1}/${threadTweets.length} — @${t.authorHandle} (${tweetDate}) ⬅ this tweet`
+        : `${idx + 1}/${threadTweets.length} — @${t.authorHandle} (${tweetDate})`;
+
+      if (isCurrentTweet) {
+        sections.push(`### ${headerLabel}`);
+        sections.push("");
+        sections.push(tweetBody);
+      } else {
+        sections.push(`> [!note]- ${headerLabel}`);
+        sections.push(">");
+        const tweetLines = tweetBody.split("\n");
+        tweetLines.forEach(line => {
+          sections.push(`> ${line}`);
+        });
+      }
+
+      const tMediaUrls = (t.mediaUrls || []).filter(u => u && u !== "");
+      if (tMediaUrls.length > 0) {
+        if (isCurrentTweet) {
+          sections.push("");
+          tMediaUrls.forEach((url, i) => {
+            sections.push(`![Tweet media ${i + 1}](${url})`);
+          });
+        } else {
+          sections.push(">");
+          tMediaUrls.forEach((url, i) => {
+            sections.push(`> ![Tweet media ${i + 1}](${url})`);
+          });
+        }
+      }
+
+      if (t.quotedTweetContent && t.quotedTweetAuthorHandle) {
+        if (isCurrentTweet) {
+          sections.push("");
+          sections.push(`> **${t.quotedTweetAuthorName || t.quotedTweetAuthorHandle}** (@${t.quotedTweetAuthorHandle})`);
+          sections.push(">");
+          t.quotedTweetContent.split("\n").forEach(line => {
+            sections.push(`> ${line}`);
+          });
+        } else {
+          sections.push(">");
+          sections.push(`> > **${t.quotedTweetAuthorName || t.quotedTweetAuthorHandle}** (@${t.quotedTweetAuthorHandle})`);
+          sections.push("> >");
+          t.quotedTweetContent.split("\n").forEach(line => {
+            sections.push(`> > ${line}`);
+          });
+        }
+      }
+
+      sections.push("");
+      if (!isCurrentTweet) {
+        sections.push(`> [View tweet](${t.tweetUrl})`);
+        sections.push("");
+      }
     });
   }
 
@@ -1312,8 +1403,9 @@ export async function registerRoutes(
     try {
       const tweet = await storage.getTweetNote(req.params.id);
       if (!tweet) return res.status(404).json({ message: "Tweet note not found" });
+      const allTweets = await storage.getAllTweetNotes();
       const s = await storage.getSettings();
-      const md = generateMarkdown(tweet, s.filenameTemplate);
+      const md = generateMarkdown(tweet, s.filenameTemplate, allTweets);
       res.setHeader("Content-Type", "text/markdown; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${md.filename}"`);
       res.send(md.content);
@@ -1326,7 +1418,7 @@ export async function registerRoutes(
     try {
       const tweets = await storage.getAllTweetNotes();
       const s = await storage.getSettings();
-      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate, tweets));
       res.json(files);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1340,7 +1432,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No notes to export" });
       }
       const s = await storage.getSettings();
-      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate, tweets));
 
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", 'attachment; filename="BrainMirror-Obsidian-Notes.zip"');
@@ -1389,7 +1481,7 @@ export async function registerRoutes(
       }
       const s = await storage.getSettings();
       const files = tweets.map(t => {
-        const md = generateMarkdown(t, s.filenameTemplate);
+        const md = generateMarkdown(t, s.filenameTemplate, tweets);
         const datePath = md.folderPath ? `${md.folderPath}/${md.filename}` : md.filename;
         return { filename: datePath, content: md.content };
       });

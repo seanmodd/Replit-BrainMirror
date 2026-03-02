@@ -107,7 +107,7 @@ export default function TweetsPage() {
                 const autoTags = getAutoTags(tweet);
                 const profileSrc = tweet.authorProfileImageUrl ? proxyImageUrl(tweet.authorProfileImageUrl) : null;
                 return (
-                  <article key={tweet.id} data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onDoubleClick={() => setThreadTweet(tweet)}>
+                  <article key={tweet.id} data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onClick={() => setThreadTweet(tweet)}>
                     {info.isRetweet && (
                       <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[44px]">
                         <Repeat2 size={12} />
@@ -138,7 +138,16 @@ export default function TweetsPage() {
                           {tweet.source === "public" && <Globe size={12} className="text-[#A78BFA] shrink-0 ml-0.5" />}
                           {tweet.source === "manual" && <Pencil size={12} className="text-muted-foreground shrink-0 ml-0.5" />}
                         </div>
-                        <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
+                        <div className="text-[14px] text-foreground/90 leading-[20px] mt-0.5 whitespace-pre-wrap break-words">{formatContent(info.displayContent)}</div>
+                        {(() => {
+                          const threadCount = allTweets.filter((t: any) => t.conversationId === tweet.conversationId).length;
+                          return threadCount > 1 ? (
+                            <div data-testid={`thread-indicator-${tweet.id}`} className="flex items-center gap-1 mt-1.5 text-[12px] text-[#7C3AED] font-medium">
+                              <MessageCircle size={12} />
+                              <span>Thread ({threadCount} tweets)</span>
+                            </div>
+                          ) : null;
+                        })()}
                         {mediaUrls.length > 0 && (
                           <div className={`mt-2 rounded-xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
                             {mediaUrls.slice(0, 4).map((url: string, i: number) =>

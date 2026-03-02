@@ -81,6 +81,9 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - Wiki-links for authors (`[[@handle]]`) and hashtags (`[[#tag]]`)
 - ZIP download for bulk export into Obsidian vault
 - Individual file download also available
+- Thread-aware: markdown files include full thread context with Obsidian callout syntax (`> [!note]-`) for collapsible thread tweets
+- `generateMarkdown(tweet, template, allTweets?)` accepts optional allTweets to reconstruct threads by conversationId
+- Thread tweets sorted chronologically; current tweet shown inline, others in collapsible callouts
 
 ## Shared Utilities (client/src/lib/utils.ts)
 
