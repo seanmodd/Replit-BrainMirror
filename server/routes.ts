@@ -220,10 +220,15 @@ export async function registerRoutes(
       let tweets;
       if (search && typeof search === "string") {
         tweets = await storage.searchTweetNotes(search);
-      } else if (tag && typeof tag === "string") {
-        tweets = await storage.filterTweetNotesByTag(tag);
       } else {
         tweets = await storage.getAllTweetNotes();
+      }
+      if (tag && typeof tag === "string") {
+        const normalizedTag = tag.startsWith("#") ? tag : `#${tag}`;
+        tweets = tweets.filter(t => {
+          const tweetTags = autoGenerateTags(t);
+          return tweetTags.includes(normalizedTag);
+        });
       }
       if (source && typeof source === "string") {
         tweets = tweets.filter(t => t.source === source);
@@ -307,17 +312,6 @@ export async function registerRoutes(
       ]);
       const ownUsername = (process.env.X_USERNAME || "").toLowerCase();
       const authorMap = new Map<string, { handle: string; name: string; count: number }>();
-      const allTagsSet = new Set<string>();
-
-      const topicKeywords: Record<string, string[]> = {
-        "ai": ["AI", "artificial intelligence", "machine learning", "GPT", "LLM", "ChatGPT", "OpenAI"],
-        "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3"],
-        "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript"],
-        "startup": ["startup", "founder", "fundraising", "venture capital", "YC"],
-        "design": ["design", "UX", "UI", "Figma"],
-        "productivity": ["productivity", "workflow", "automation"],
-      };
-
       for (const tweet of allTweets) {
         const real = getRealAuthor(tweet);
         const key = real.handle.toLowerCase();
@@ -332,33 +326,21 @@ export async function registerRoutes(
             authorMap.set(key, { handle: real.handle, name: real.name, count: 1 });
           }
         }
-
-        for (const t of (tweet.tags || [])) {
-          allTagsSet.add(t.startsWith("#") ? t : `#${t}`);
-        }
-        const hashtagMatches = (tweet.content || "").match(/#(\w+)/g);
-        if (hashtagMatches) {
-          for (const ht of hashtagMatches) allTagsSet.add(ht);
-        }
-        if (tweet.source) allTagsSet.add(`#${tweet.source}`);
-        const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
-        if (mediaUrls.length > 0) allTagsSet.add("#hasmedia");
-        if (tweet.quotedTweetId || tweet.quotedTweetContent) allTagsSet.add("#hasquote");
-        if (tweet.inReplyToTweetId) allTagsSet.add("#reply");
-        const contentLower = (tweet.content || "").toLowerCase();
-        for (const [topic, keywords] of Object.entries(topicKeywords)) {
-          for (const kw of keywords) {
-            if (contentLower.includes(kw.toLowerCase())) {
-              allTagsSet.add(`#${topic}`);
-              break;
-            }
-          }
-        }
-        if ((tweet.content || "").length > 200) allTagsSet.add("#longform");
       }
 
       const authors = Array.from(authorMap.values()).sort((a, b) => b.count - a.count);
-      const tags = Array.from(allTagsSet).sort();
+
+      const tagCountMap = new Map<string, number>();
+      for (const tweet of allTweets) {
+        const tweetTags = autoGenerateTags(tweet);
+        for (const tag of tweetTags) {
+          tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
+        }
+      }
+
+      const tags = Array.from(tagCountMap.entries())
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count);
       const count = allTweets.length;
       res.json({
         totalTweets: count,

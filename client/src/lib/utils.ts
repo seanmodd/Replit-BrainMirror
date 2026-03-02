@@ -103,14 +103,44 @@ export function getAutoTags(tweet: any): string[] {
     tags.add(t.startsWith("#") ? t : `#${t}`);
   }
   const content = tweet.content || "";
-  const isRt = content.startsWith("RT @") || tweet.source === "retweet";
-  if (isRt) {
-    tags.add("#retweet");
+  const hashtagMatches = content.match(/#(\w+)/g);
+  if (hashtagMatches) {
+    for (const ht of hashtagMatches) tags.add(ht);
   }
-  if (tweet.source === "bookmark" || (!isRt && tweet.source !== "retweet")) {
-    tags.add("#bookmark");
+  if (tweet.source) tags.add(`#${tweet.source}`);
+  const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+  if (mediaUrls.length > 0) tags.add("#hasmedia");
+  if (tweet.quotedTweetId || tweet.quotedTweetContent) tags.add("#hasquote");
+  if (tweet.inReplyToTweetId) tags.add("#reply");
+  if (content.startsWith("RT @")) tags.add("#retweet");
+  const mentionMatches = content.match(/@(\w+)/g);
+  if (mentionMatches) {
+    for (const m of mentionMatches) tags.add(`#${m.slice(1)}`);
   }
-  return Array.from(tags);
+  const contentLower = content.toLowerCase();
+  const topicKeywords: Record<string, string[]> = {
+    "ai": ["AI", "artificial intelligence", "machine learning", "ML", "GPT", "LLM", "neural network", "deep learning", "ChatGPT", "OpenAI", "AGI"],
+    "crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3", "NFT", "DeFi", "BTC", "ETH"],
+    "programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript", "React", "code", "frontend", "backend", "fullstack"],
+    "startup": ["startup", "founder", "fundraising", "venture capital", "VC", "seed round", "Series A", "YC", "accelerator"],
+    "design": ["design", "UX", "UI", "Figma", "typography", "branding", "CSS"],
+    "productivity": ["productivity", "workflow", "automation", "efficiency", "habit", "routine", "time management"],
+    "marketing": ["marketing", "SEO", "growth", "content marketing", "social media", "branding", "audience"],
+    "finance": ["finance", "investing", "stock", "market", "portfolio", "trading", "economy"],
+    "writing": ["writing", "copywriting", "newsletter", "blogging", "content creation", "storytelling"],
+  };
+  for (const [topic, keywords] of Object.entries(topicKeywords)) {
+    for (const kw of keywords) {
+      if (contentLower.includes(kw.toLowerCase())) {
+        tags.add(`#${topic}`);
+        break;
+      }
+    }
+  }
+  const urlMatches = content.match(/https?:\/\/[^\s]+/g);
+  if (urlMatches && urlMatches.length > 0) tags.add("#haslinks");
+  if (content.length > 200) tags.add("#longform");
+  return Array.from(tags).sort();
 }
 
 export interface LinkCardData {

@@ -12,7 +12,7 @@ export default function TagsPage() {
     queryFn: api.stats,
   });
 
-  const tags: string[] = stats?.tags || [];
+  const tags: { tag: string; count: number }[] = stats?.tags || [];
 
   return (
     <div className="h-full flex flex-col p-6 max-w-5xl mx-auto gap-6 overflow-y-auto">
@@ -39,12 +39,13 @@ export default function TagsPage() {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {tags.map((tag: string) => (
+          {tags.map(({ tag, count }) => (
             <Link key={tag} href={`/tweets?tag=${encodeURIComponent(tag)}`}>
               <Card data-testid={`card-tag-${tag}`} className="hover:bg-foreground/[0.03] transition-colors cursor-pointer">
                 <CardContent className="px-4 py-2.5 flex items-center gap-2">
                   <Hash size={14} className="text-[#10B981]" />
                   <span className="text-sm font-medium text-foreground">{tag}</span>
+                  <span className="text-xs text-muted-foreground">({count})</span>
                 </CardContent>
               </Card>
             </Link>
