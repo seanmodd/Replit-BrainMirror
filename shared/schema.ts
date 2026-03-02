@@ -57,6 +57,8 @@ export const settings = pgTable("settings", {
   filenameTemplate: text("filename_template").notNull().default("Twitter - {author_handle} - {content_trunc_40} ({date})"),
   generateAuthorHubs: boolean("generate_author_hubs").notNull().default(true),
   generateDashboard: boolean("generate_dashboard").notNull().default(true),
+  githubRepo: text("github_repo").notNull().default("seanmodd/brainmirror"),
+  githubFolder: text("github_folder").notNull().default(""),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({

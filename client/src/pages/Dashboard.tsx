@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal, Globe, Pencil } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, MessageCircle, Heart, MoreHorizontal, Globe, Pencil, Github, Upload } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,16 @@ export default function Dashboard() {
   const { data: tweets, isLoading: tweetsLoading } = useQuery({
     queryKey: ["/api/tweets"],
     queryFn: () => api.tweets.list(),
+  });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["/api/settings"],
+    queryFn: api.settings.get,
+  });
+
+  const { data: ghStatus } = useQuery({
+    queryKey: ["/api/github/status"],
+    queryFn: api.github.status,
   });
 
   const invalidateAfterSync = () => {
@@ -56,7 +66,37 @@ export default function Dashboard() {
     },
   });
 
-  const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending;
+  const githubPushMutation = useMutation({
+    mutationFn: api.github.push,
+    onSuccess: (data) => {
+      const total = data.created.length + data.updated.length;
+      const parts = [];
+      if (data.created.length) parts.push(`${data.created.length} created`);
+      if (data.updated.length) parts.push(`${data.updated.length} updated`);
+      if (data.unchanged.length) parts.push(`${data.unchanged.length} unchanged`);
+      if (data.errors.length) parts.push(`${data.errors.length} failed`);
+      toast({
+        title: `Synced ${total} notes to GitHub`,
+        description: parts.join(", "),
+        variant: data.errors.length ? "destructive" : "default",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "GitHub sync failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleGitHubSync = () => {
+    const repo = settingsData?.githubRepo || "seanmodd/brainmirror";
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName) {
+      toast({ title: "Invalid repo", description: "Configure your GitHub repo in Settings first.", variant: "destructive" });
+      return;
+    }
+    githubPushMutation.mutate({ owner, repo: repoName, folder: settingsData?.githubFolder || undefined });
+  };
+
+  const isSyncing = publicSyncMutation.isPending || bookmarkSyncMutation.isPending || githubPushMutation.isPending;
 
   const recentTweets = tweets?.slice(0, 5) || [];
 
@@ -96,6 +136,22 @@ export default function Dashboard() {
               )}
               {bookmarkSyncMutation.isPending ? "Syncing..." : "Sync Bookmarks"}
             </Button>
+            {ghStatus?.connected && (
+              <Button
+                data-testid="button-sync-github"
+                variant="outline"
+                className="w-fit border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                onClick={handleGitHubSync}
+                disabled={isSyncing}
+              >
+                {githubPushMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Github className="mr-2 h-4 w-4" />
+                )}
+                {githubPushMutation.isPending ? "Pushing..." : "Sync to GitHub"}
+              </Button>
+            )}
           </div>
         </div>
       </div>

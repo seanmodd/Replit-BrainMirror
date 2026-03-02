@@ -68,6 +68,8 @@ A web-based second brain system that transforms bookmarked tweets into a structu
 - Push notes directly to GitHub repo (e.g. `seanmodd/brainmirror`)
 - Obsidian syncs from the GitHub repo automatically
 - Endpoints: `GET /api/github/status`, `POST /api/github/push`
+- Dashboard: "Sync to GitHub" button (visible when GitHub is connected) uses persisted repo/folder settings
+- Settings: `githubRepo` and `githubFolder` fields persisted in settings table
 
 ## Obsidian Export
 

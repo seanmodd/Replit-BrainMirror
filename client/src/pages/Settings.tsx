@@ -24,6 +24,8 @@ export default function Settings() {
     filenameTemplate: "",
     generateAuthorHubs: true,
     generateDashboard: true,
+    githubRepo: "seanmodd/brainmirror",
+    githubFolder: "",
   });
 
   useEffect(() => {
@@ -34,6 +36,8 @@ export default function Settings() {
         filenameTemplate: settings.filenameTemplate || "",
         generateAuthorHubs: settings.generateAuthorHubs ?? true,
         generateDashboard: settings.generateDashboard ?? true,
+        githubRepo: settings.githubRepo || "seanmodd/brainmirror",
+        githubFolder: settings.githubFolder || "",
       });
     }
   }, [settings]);
@@ -550,12 +554,30 @@ function BookmarkSyncCard() {
 
 function GitHubSyncCard() {
   const { toast } = useToast();
-  const [repoInput, setRepoInput] = useState("seanmodd/brainmirror");
+  const [repoInput, setRepoInput] = useState("");
   const [folderInput, setFolderInput] = useState("");
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["/api/settings"],
+    queryFn: api.settings.get,
+  });
+
+  useEffect(() => {
+    if (settingsData && !settingsLoaded) {
+      setRepoInput(settingsData.githubRepo || "seanmodd/brainmirror");
+      setFolderInput(settingsData.githubFolder || "");
+      setSettingsLoaded(true);
+    }
+  }, [settingsData, settingsLoaded]);
 
   const { data: ghStatus, isLoading: ghLoading } = useQuery({
     queryKey: ["/api/github/status"],
     queryFn: api.github.status,
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: (data: any) => api.settings.update(data),
   });
 
   const pushMutation = useMutation({
@@ -583,6 +605,9 @@ function GitHubSyncCard() {
     if (!owner || !repo) {
       toast({ title: "Invalid repo", description: "Use the format owner/repo", variant: "destructive" });
       return;
+    }
+    if (settingsData && (settingsData.githubRepo !== repoInput || settingsData.githubFolder !== folderInput)) {
+      settingsMutation.mutate({ ...settingsData, githubRepo: repoInput, githubFolder: folderInput });
     }
     pushMutation.mutate({ owner, repo, folder: folderInput || undefined });
   };
