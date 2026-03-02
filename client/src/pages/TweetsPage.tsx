@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
 import { useState, useMemo } from "react";
+import TweetThreadModal from "@/components/TweetThreadModal";
 
 export default function TweetsPage() {
   const { toast } = useToast();
@@ -18,10 +19,16 @@ export default function TweetsPage() {
   const tagFilter = queryParams.get("tag") || "";
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("");
+  const [threadTweet, setThreadTweet] = useState<any>(null);
 
   const { data: tweets, isLoading } = useQuery({
     queryKey: ["/api/tweets", search, sourceFilter, tagFilter],
     queryFn: () => api.tweets.list({ search: search || undefined, source: sourceFilter || undefined, tag: tagFilter || undefined }),
+  });
+
+  const { data: allTweets = [] } = useQuery({
+    queryKey: ["/api/tweets", {}],
+    queryFn: () => api.tweets.list(),
   });
 
   const deleteMutation = useMutation({
@@ -98,7 +105,7 @@ export default function TweetsPage() {
                 const info = getDisplayInfo(tweet);
                 const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
                 return (
-                  <article key={tweet.id} data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
+                  <article key={tweet.id} data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onDoubleClick={() => setThreadTweet(tweet)}>
                     {info.isRetweet && (
                       <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[44px]">
                         <Repeat2 size={12} />
@@ -158,6 +165,13 @@ export default function TweetsPage() {
           )}
         </CardContent>
       </Card>
+
+      <TweetThreadModal
+        tweet={threadTweet}
+        allTweets={allTweets}
+        open={!!threadTweet}
+        onOpenChange={(open) => { if (!open) setThreadTweet(null); }}
+      />
     </div>
   );
 }

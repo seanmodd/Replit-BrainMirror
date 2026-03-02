@@ -39,13 +39,16 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
     "---",
     `tweet_url: ${tweet.tweetUrl}`,
     `author_handle: ${tweet.authorHandle}`,
+    `author_name: ${tweet.authorName}`,
     `created_at: ${tweet.createdAt}`,
+    `source: ${tweet.source || "manual"}`,
     tweet.threadPosition ? `thread_position: ${tweet.threadPosition}` : null,
     `conversation_id: ${tweet.conversationId}`,
     `tweet_id: ${tweet.tweetId}`,
     `tags: [${(tweet.tags || []).join(", ")}]`,
     tweet.quotedTweetId ? `quoted_tweet_id: ${tweet.quotedTweetId}` : null,
     tweet.inReplyToTweetId ? `in_reply_to_tweet_id: ${tweet.inReplyToTweetId}` : null,
+    (tweet.mediaUrls || []).filter(u => u).length > 0 ? `media_count: ${tweet.mediaUrls!.filter(u => u).length}` : null,
     "---",
   ].filter(Boolean).join("\n");
 
@@ -53,7 +56,34 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
     .replace(/@(\w+)/g, "[[@$1]]")
     .replace(/#(\w+)/g, "[[#$1]]");
 
-  const content = `${frontmatter}\n\n${body}\n`;
+  const sections: string[] = [frontmatter, "", body];
+
+  const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
+  if (mediaUrls.length > 0) {
+    sections.push("");
+    sections.push("## Media");
+    mediaUrls.forEach((url, i) => {
+      sections.push(`![Tweet media ${i + 1}](${url})`);
+    });
+  }
+
+  if (tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle) {
+    sections.push("");
+    sections.push("## Quoted Tweet");
+    sections.push(`> **${tweet.quotedTweetAuthorName || tweet.quotedTweetAuthorHandle}** (@${tweet.quotedTweetAuthorHandle})`);
+    sections.push(">");
+    const quotedLines = tweet.quotedTweetContent.split("\n");
+    quotedLines.forEach(line => {
+      sections.push(`> ${line}`);
+    });
+  }
+
+  sections.push("");
+  sections.push(`---`);
+  sections.push(`[View original tweet](${tweet.tweetUrl})`);
+  sections.push("");
+
+  const content = sections.join("\n");
 
   return { filename: safeName, content };
 }

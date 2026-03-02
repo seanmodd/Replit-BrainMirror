@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import TweetThreadModal from "@/components/TweetThreadModal";
 
 type SourceTab = "all" | "bookmark" | "retweet" | "public" | "manual";
 type SortOption = "newest" | "oldest" | "author-az" | "author-za";
@@ -40,6 +41,7 @@ export default function BookmarksView() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [threadTweet, setThreadTweet] = useState<any>(null);
   const { toast } = useToast();
 
   const queryParams = useMemo(() => {
@@ -331,7 +333,7 @@ export default function BookmarksView() {
         ) : (
           <div className="divide-y divide-border">
             {tweets.map((tweet: any) => (
-              <TweetCard key={tweet.id} tweet={tweet} allTweets={tweets} onDelete={() => deleteMutation.mutate(tweet.id)} />
+              <TweetCard key={tweet.id} tweet={tweet} allTweets={allTweetsRaw} onDelete={() => deleteMutation.mutate(tweet.id)} onDoubleClick={() => setThreadTweet(tweet)} />
             ))}
           </div>
         )}
@@ -340,11 +342,18 @@ export default function BookmarksView() {
       {(showSortMenu || showFilterMenu) && (
         <div className="fixed inset-0 z-20" onClick={() => { setShowSortMenu(false); setShowFilterMenu(false); }} />
       )}
+
+      <TweetThreadModal
+        tweet={threadTweet}
+        allTweets={allTweetsRaw}
+        open={!!threadTweet}
+        onOpenChange={(open) => { if (!open) setThreadTweet(null); }}
+      />
     </div>
   );
 }
 
-function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[]; onDelete: () => void }) {
+function TweetCard({ tweet, allTweets, onDelete, onDoubleClick }: { tweet: any; allTweets: any[]; onDelete: () => void; onDoubleClick: () => void }) {
   const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
 
   const hasStoredQuote = tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle;
@@ -358,7 +367,7 @@ function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[
   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
 
   return (
-    <article data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer group">
+    <article data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer group" onDoubleClick={onDoubleClick}>
       {isRetweet && (
         <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[52px]">
           <Repeat2 size={14} />

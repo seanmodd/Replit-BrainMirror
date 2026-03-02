@@ -8,9 +8,12 @@ import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { getDisplayInfo, formatTimeAgo, formatContent } from "@/lib/utils";
+import TweetThreadModal from "@/components/TweetThreadModal";
+import { useState } from "react";
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [threadTweet, setThreadTweet] = useState<any>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/stats"],
@@ -256,7 +259,7 @@ export default function Dashboard() {
                   const quoteContent = hasStoredQuote ? tweet.quotedTweetContent : fallbackQuote?.content;
                   const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
                   return (
-                    <article key={tweet.id} data-testid={`card-recent-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
+                    <article key={tweet.id} data-testid={`card-recent-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer" onDoubleClick={() => setThreadTweet(tweet)}>
                       {info.isRetweet && (
                         <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[44px]">
                           <Repeat2 size={12} />
@@ -363,6 +366,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <TweetThreadModal
+        tweet={threadTweet}
+        allTweets={tweets || []}
+        open={!!threadTweet}
+        onOpenChange={(open: boolean) => { if (!open) setThreadTweet(null); }}
+      />
     </div>
   );
 }
