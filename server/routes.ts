@@ -455,7 +455,7 @@ export async function registerRoutes(
       let totalFetched = 0;
 
       try {
-        const importTweets = async (tweetList: any[], authorMap: Map<string, any>, refTweetsMap: Map<string, any>) => {
+        const importTweets = async (tweetList: any[], authorMap: Map<string, any>, refTweetsMap: Map<string, any>, mediaMap: Map<string, any>) => {
           let imported = 0;
           let skipped = 0;
           for (const tw of tweetList) {
@@ -486,15 +486,60 @@ export async function registerRoutes(
               tweetUrl = `https://x.com/${authorHandle}/status/${tw.id}`;
             }
 
+            const quotedRef = tw.referenced_tweets?.find((r: any) => r.type === "quoted");
+            const quotedId = quotedRef?.id || null;
+            let quotedTweetContent: string | null = null;
+            let quotedTweetAuthorHandle: string | null = null;
+            let quotedTweetAuthorName: string | null = null;
+
+            if (quotedId && refTweetsMap.has(quotedId)) {
+              const quotedTw = refTweetsMap.get(quotedId);
+              quotedTweetContent = quotedTw.text || null;
+              const quotedAuthor = quotedTw.author_id ? authorMap.get(quotedTw.author_id) : null;
+              if (quotedAuthor) {
+                quotedTweetAuthorHandle = quotedAuthor.username;
+                quotedTweetAuthorName = quotedAuthor.name || quotedAuthor.username;
+              }
+            }
+
+            const mediaUrls: string[] = [];
+            if (tw.attachments?.media_keys) {
+              for (const key of tw.attachments.media_keys) {
+                const m = mediaMap.get(key);
+                if (m) mediaUrls.push(m.url || m.preview_image_url || "");
+              }
+            }
+            if (quotedId && refTweetsMap.has(quotedId)) {
+              const quotedTw = refTweetsMap.get(quotedId);
+              if (quotedTw.attachments?.media_keys) {
+                for (const key of quotedTw.attachments.media_keys) {
+                  const m = mediaMap.get(key);
+                  if (m && !mediaUrls.includes(m.url || m.preview_image_url || "")) {
+                    mediaUrls.push(m.url || m.preview_image_url || "");
+                  }
+                }
+              }
+            }
+
             const existing = await storage.getTweetNoteByTweetId(tw.id);
             if (existing) {
-              const needsAuthorUpdate = existing.authorHandle !== authorHandle && authorHandle !== "unknown" && authorHandle !== username;
-              if (needsAuthorUpdate) {
-                await storage.updateTweetNote(existing.id, {
-                  authorHandle,
-                  authorName,
-                  tweetUrl,
-                });
+              const updates: any = {};
+              if (existing.authorHandle !== authorHandle && authorHandle !== "unknown" && authorHandle !== username) {
+                updates.authorHandle = authorHandle;
+                updates.authorName = authorName;
+                updates.tweetUrl = tweetUrl;
+              }
+              if (quotedTweetContent && !existing.quotedTweetContent) {
+                updates.quotedTweetContent = quotedTweetContent;
+                updates.quotedTweetAuthorHandle = quotedTweetAuthorHandle;
+                updates.quotedTweetAuthorName = quotedTweetAuthorName;
+                updates.quotedTweetId = quotedId;
+              }
+              if (mediaUrls.length > 0 && (!existing.mediaUrls || existing.mediaUrls.length === 0)) {
+                updates.mediaUrls = mediaUrls;
+              }
+              if (Object.keys(updates).length > 0) {
+                await storage.updateTweetNote(existing.id, updates);
               }
               skipped++;
               continue;
@@ -510,7 +555,6 @@ export async function registerRoutes(
             }
 
             const replyToId = tw.referenced_tweets?.find((r: any) => r.type === "replied_to")?.id;
-            const quotedId = tw.referenced_tweets?.find((r: any) => r.type === "quoted")?.id;
 
             await storage.createTweetNote({
               tweetId: tw.id,
@@ -522,10 +566,14 @@ export async function registerRoutes(
               content: tw.text,
               tags,
               threadPosition: null,
-              quotedTweetId: quotedId || null,
+              quotedTweetId: quotedId,
               inReplyToTweetId: replyToId || null,
               links,
               source: isRetweet ? "retweet" : "public",
+              quotedTweetContent,
+              quotedTweetAuthorHandle,
+              quotedTweetAuthorName,
+              mediaUrls,
             });
             imported++;
           }
@@ -533,8 +581,8 @@ export async function registerRoutes(
         };
 
         if (syncTypes.includes("tweets")) {
-          const { tweets, authors, refTweets } = await fetchUserTweets(bearerToken, userId);
-          const result = await importTweets(tweets, authors, refTweets);
+          const { tweets, authors, refTweets, media } = await fetchUserTweets(bearerToken, userId);
+          const result = await importTweets(tweets, authors, refTweets, media);
           totalImported += result.imported;
           totalSkipped += result.skipped;
           totalFetched += tweets.length;
@@ -570,31 +618,77 @@ export async function registerRoutes(
       const syncLog = await storage.createSyncLog({ status: "running", tweetsProcessed: 0 });
 
       try {
-        const { tweets: bookmarks, authors } = await fetchBookmarks();
+        const { tweets: bookmarks, authors, refTweets, media } = await fetchBookmarks();
 
         let imported = 0;
         let skipped = 0;
         let updated = 0;
 
         for (const bm of bookmarks) {
-          const existing = await storage.getTweetNoteByTweetId(bm.id);
           const author = authors.get(bm.author_id);
           const authorHandle = author?.username || "unknown";
           const authorName = author?.name || authorHandle;
 
+          const quotedRef = bm.referenced_tweets?.find(r => r.type === "quoted");
+          const replyToId = bm.referenced_tweets?.find(r => r.type === "replied_to")?.id;
+          const quotedId = quotedRef?.id || null;
+
+          let quotedTweetContent: string | null = null;
+          let quotedTweetAuthorHandle: string | null = null;
+          let quotedTweetAuthorName: string | null = null;
+
+          if (quotedId && refTweets.has(quotedId)) {
+            const quotedTw = refTweets.get(quotedId);
+            quotedTweetContent = quotedTw.text || null;
+            const quotedAuthor = quotedTw.author_id ? authors.get(quotedTw.author_id) : null;
+            if (quotedAuthor) {
+              quotedTweetAuthorHandle = quotedAuthor.username;
+              quotedTweetAuthorName = quotedAuthor.name || quotedAuthor.username;
+            }
+          }
+
+          const mediaUrls: string[] = [];
+          if (bm.attachments?.media_keys) {
+            for (const key of bm.attachments.media_keys) {
+              const m = media.get(key);
+              if (m) {
+                mediaUrls.push(m.url || m.preview_image_url || "");
+              }
+            }
+          }
+          if (quotedId && refTweets.has(quotedId)) {
+            const quotedTw = refTweets.get(quotedId);
+            if (quotedTw.attachments?.media_keys) {
+              for (const key of quotedTw.attachments.media_keys) {
+                const m = media.get(key);
+                if (m && !mediaUrls.includes(m.url || m.preview_image_url || "")) {
+                  mediaUrls.push(m.url || m.preview_image_url || "");
+                }
+              }
+            }
+          }
+
+          const existing = await storage.getTweetNoteByTweetId(bm.id);
           if (existing) {
-            const needsAuthorUpdate = existing.authorHandle !== authorHandle && authorHandle !== "unknown";
-            const needsSourceUpdate = existing.source !== "bookmark";
-            if (needsAuthorUpdate || needsSourceUpdate) {
-              const updates: any = {};
-              if (needsAuthorUpdate) {
-                updates.authorHandle = authorHandle;
-                updates.authorName = authorName;
-                updates.tweetUrl = `https://x.com/${authorHandle}/status/${bm.id}`;
-              }
-              if (needsSourceUpdate) {
-                updates.source = "bookmark";
-              }
+            const updates: any = {};
+            if (existing.authorHandle !== authorHandle && authorHandle !== "unknown") {
+              updates.authorHandle = authorHandle;
+              updates.authorName = authorName;
+              updates.tweetUrl = `https://x.com/${authorHandle}/status/${bm.id}`;
+            }
+            if (existing.source !== "bookmark") {
+              updates.source = "bookmark";
+            }
+            if (quotedTweetContent && !existing.quotedTweetContent) {
+              updates.quotedTweetContent = quotedTweetContent;
+              updates.quotedTweetAuthorHandle = quotedTweetAuthorHandle;
+              updates.quotedTweetAuthorName = quotedTweetAuthorName;
+              updates.quotedTweetId = quotedId;
+            }
+            if (mediaUrls.length > 0 && (!existing.mediaUrls || existing.mediaUrls.length === 0)) {
+              updates.mediaUrls = mediaUrls;
+            }
+            if (Object.keys(updates).length > 0) {
               await storage.updateTweetNote(existing.id, updates);
               updated++;
             }
@@ -616,9 +710,6 @@ export async function registerRoutes(
             }
           }
 
-          const replyToId = bm.referenced_tweets?.find(r => r.type === "replied_to")?.id;
-          const quotedId = bm.referenced_tweets?.find(r => r.type === "quoted")?.id;
-
           await storage.createTweetNote({
             tweetId: bm.id,
             conversationId: bm.conversation_id || bm.id,
@@ -629,10 +720,14 @@ export async function registerRoutes(
             content: bm.text,
             tags,
             threadPosition: null,
-            quotedTweetId: quotedId || null,
+            quotedTweetId: quotedId,
             inReplyToTweetId: replyToId || null,
             links,
             source: "bookmark",
+            quotedTweetContent,
+            quotedTweetAuthorHandle,
+            quotedTweetAuthorName,
+            mediaUrls,
           });
           imported++;
         }

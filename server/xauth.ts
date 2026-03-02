@@ -169,6 +169,7 @@ export interface BookmarkTweet {
   conversation_id?: string;
   in_reply_to_user_id?: string;
   referenced_tweets?: { type: string; id: string }[];
+  attachments?: { media_keys?: string[] };
   entities?: {
     urls?: { expanded_url: string }[];
     hashtags?: { tag: string }[];
@@ -182,15 +183,23 @@ export interface BookmarkAuthor {
   username: string;
 }
 
-export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {
+export interface MediaItem {
+  media_key: string;
+  type: string;
+  url?: string;
+  preview_image_url?: string;
+}
+
+export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any>; media: Map<string, MediaItem> }> {
   const token = await getValidAccessToken();
   const userId = TOKEN_STORE.userId;
   if (!userId) throw new Error("User ID not available. Please re-authorize.");
 
   const params = new URLSearchParams({
-    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
+    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
     "user.fields": "name,username",
-    expansions: "author_id",
+    "media.fields": "url,preview_image_url,type",
+    expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
   });
 
@@ -219,25 +228,38 @@ export async function fetchBookmarks(): Promise<{ tweets: BookmarkTweet[]; autho
   const data = await response.json();
   const tweets: BookmarkTweet[] = data.data || [];
   const authors = new Map<string, BookmarkAuthor>();
+  const refTweets = new Map<string, any>();
+  const media = new Map<string, MediaItem>();
 
   if (data.includes?.users) {
     for (const user of data.includes.users) {
       authors.set(user.id, user);
     }
   }
+  if (data.includes?.tweets) {
+    for (const tw of data.includes.tweets) {
+      refTweets.set(tw.id, tw);
+    }
+  }
+  if (data.includes?.media) {
+    for (const m of data.includes.media) {
+      media.set(m.media_key, m);
+    }
+  }
 
-  return { tweets, authors };
+  return { tweets, authors, refTweets, media };
 }
 
 export function getRedirectUriForDisplay(): string {
   return getRedirectUri();
 }
 
-export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any> }> {
+export async function fetchUserTweets(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor>; refTweets: Map<string, any>; media: Map<string, MediaItem> }> {
   const params = new URLSearchParams({
-    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id",
+    "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments",
     "user.fields": "name,username",
-    expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id",
+    "media.fields": "url,preview_image_url,type",
+    expansions: "author_id,referenced_tweets.id,referenced_tweets.id.author_id,attachments.media_keys",
     max_results: "100",
   });
 
@@ -267,7 +289,13 @@ export async function fetchUserTweets(bearerToken: string, userId: string): Prom
       refTweets.set(tw.id, tw);
     }
   }
-  return { tweets, authors, refTweets };
+  const media = new Map<string, MediaItem>();
+  if (data.includes?.media) {
+    for (const m of data.includes.media) {
+      media.set(m.media_key, m);
+    }
+  }
+  return { tweets, authors, refTweets, media };
 }
 
 export async function fetchUserLikes(bearerToken: string, userId: string): Promise<{ tweets: BookmarkTweet[]; authors: Map<string, BookmarkAuthor> }> {

@@ -18,6 +18,10 @@ export const tweetNotes = pgTable("tweet_notes", {
   inReplyToTweetId: text("in_reply_to_tweet_id"),
   links: text("links").array().notNull().default(sql`'{}'::text[]`),
   source: text("source").notNull().default("manual"),
+  quotedTweetContent: text("quoted_tweet_content"),
+  quotedTweetAuthorHandle: text("quoted_tweet_author_handle"),
+  quotedTweetAuthorName: text("quoted_tweet_author_name"),
+  mediaUrls: text("media_urls").array().notNull().default(sql`'{}'::text[]`),
   syncedAt: timestamp("synced_at").defaultNow().notNull(),
 });
 
@@ -31,7 +35,7 @@ export type TweetNote = typeof tweetNotes.$inferSelect;
 
 export const syncLogs = pgTable("sync_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  status: text("status").notNull(), // 'success' | 'error' | 'running'
+  status: text("status").notNull(),
   tweetsProcessed: integer("tweets_processed").notNull().default(0),
   errorMessage: text("error_message"),
   startedAt: timestamp("started_at").defaultNow().notNull(),

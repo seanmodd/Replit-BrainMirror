@@ -346,7 +346,16 @@ export default function BookmarksView() {
 
 function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[]; onDelete: () => void }) {
   const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
-  const quotedTweet = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
+
+  const hasStoredQuote = tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle;
+  const fallbackQuote = tweet.quotedTweetId ? allTweets.find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
+  const showQuote = hasStoredQuote || fallbackQuote;
+  const quoteName = hasStoredQuote ? tweet.quotedTweetAuthorName : fallbackQuote?.authorName;
+  const quoteHandle = hasStoredQuote ? tweet.quotedTweetAuthorHandle : fallbackQuote?.authorHandle;
+  const quoteContent = hasStoredQuote ? tweet.quotedTweetContent : fallbackQuote?.content;
+  const quoteCreatedAt = fallbackQuote?.createdAt;
+
+  const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
 
   return (
     <article data-testid={`card-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer group">
@@ -396,20 +405,39 @@ function TweetCard({ tweet, allTweets, onDelete }: { tweet: any; allTweets: any[
             {formatContent(displayContent)}
           </div>
 
-          {quotedTweet && (
+          {mediaUrls.length > 0 && (
+            <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+              {mediaUrls.map((url: string, i: number) => (
+                <img
+                  key={i}
+                  data-testid={`img-media-${tweet.id}-${i}`}
+                  src={url}
+                  alt=""
+                  className={`w-full object-cover ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
+
+          {showQuote && (
             <div className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors">
               <div className="p-3">
                 <div className="flex items-center gap-1 mb-1">
                   <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-[10px]">
-                    {quotedTweet.authorName?.[0]?.toUpperCase() || "?"}
+                    {(quoteName || quoteHandle)?.[0]?.toUpperCase() || "?"}
                   </div>
-                  <span className="font-bold text-[13px] text-foreground">{quotedTweet.authorName}</span>
-                  <span className="text-muted-foreground text-[13px]">@{quotedTweet.authorHandle}</span>
-                  <span className="text-muted-foreground text-[13px]">·</span>
-                  <span className="text-muted-foreground text-[13px]">{formatTimeAgo(quotedTweet.createdAt)}</span>
+                  <span className="font-bold text-[13px] text-foreground">{quoteName || quoteHandle}</span>
+                  <span className="text-muted-foreground text-[13px]">@{quoteHandle}</span>
+                  {quoteCreatedAt && (
+                    <>
+                      <span className="text-muted-foreground text-[13px]">·</span>
+                      <span className="text-muted-foreground text-[13px]">{formatTimeAgo(quoteCreatedAt)}</span>
+                    </>
+                  )}
                 </div>
                 <div className="text-[14px] text-foreground leading-[18px] whitespace-pre-wrap break-words line-clamp-4">
-                  {formatContent(quotedTweet.content)}
+                  {formatContent(quoteContent || "")}
                 </div>
               </div>
             </div>

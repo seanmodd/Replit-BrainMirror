@@ -184,6 +184,13 @@ export default function Dashboard() {
               <div className="divide-y divide-border">
                 {recentTweets.map((tweet: any) => {
                   const info = getDisplayInfo(tweet);
+                  const hasStoredQuote = tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle;
+                  const fallbackQuote = !hasStoredQuote && tweet.quotedTweetId ? (tweets || []).find((t: any) => t.tweetId === tweet.quotedTweetId) : null;
+                  const showQuote = hasStoredQuote || fallbackQuote;
+                  const quoteName = hasStoredQuote ? tweet.quotedTweetAuthorName : fallbackQuote?.authorName;
+                  const quoteHandle = hasStoredQuote ? tweet.quotedTweetAuthorHandle : fallbackQuote?.authorHandle;
+                  const quoteContent = hasStoredQuote ? tweet.quotedTweetContent : fallbackQuote?.content;
+                  const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
                   return (
                     <article key={tweet.id} data-testid={`card-recent-tweet-${tweet.id}`} className="px-4 py-3 hover:bg-foreground/[0.03] transition-colors">
                       {info.isRetweet && (
@@ -207,6 +214,29 @@ export default function Dashboard() {
                             )}
                           </div>
                           <div className="text-[14px] text-foreground/90 leading-[18px] mt-0.5 line-clamp-3 whitespace-pre-wrap">{formatContent(info.displayContent)}</div>
+                          {mediaUrls.length > 0 && (
+                            <div className={`mt-2 rounded-xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+                              {mediaUrls.slice(0, 2).map((url: string, i: number) => (
+                                <img key={i} src={url} alt="" className="w-full object-cover h-[120px]" loading="lazy" />
+                              ))}
+                            </div>
+                          )}
+                          {showQuote && (
+                            <div className="mt-2 border border-border rounded-xl overflow-hidden">
+                              <div className="p-2.5">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-[8px]">
+                                    {(quoteName || quoteHandle)?.[0]?.toUpperCase() || "?"}
+                                  </div>
+                                  <span className="font-bold text-[12px] text-foreground">{quoteName || quoteHandle}</span>
+                                  <span className="text-muted-foreground text-[12px]">@{quoteHandle}</span>
+                                </div>
+                                <div className="text-[13px] text-foreground leading-[16px] whitespace-pre-wrap break-words line-clamp-3">
+                                  {formatContent(quoteContent || "")}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           <div className="flex items-center gap-4 mt-2 -ml-2">
                             <span className="flex items-center gap-1 text-muted-foreground p-1">
                               <MessageCircle size={14} />
