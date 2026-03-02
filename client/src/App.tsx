@@ -9,12 +9,20 @@ import Dashboard from "@/pages/Dashboard";
 import BookmarksView from "@/pages/BookmarksView";
 import GraphView from "@/pages/GraphView";
 import Settings from "@/pages/Settings";
+import TweetsPage from "@/pages/TweetsPage";
+import AuthorsPage from "@/pages/AuthorsPage";
+import FilesPage from "@/pages/FilesPage";
+import TagsPage from "@/pages/TagsPage";
 
 function Router() {
   return (
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/tweets" component={TweetsPage} />
+        <Route path="/authors" component={AuthorsPage} />
+        <Route path="/files" component={FilesPage} />
+        <Route path="/tags" component={TagsPage} />
         <Route path="/bookmarks" component={BookmarksView} />
         <Route path="/graph" component={GraphView} />
         <Route path="/settings" component={Settings} />

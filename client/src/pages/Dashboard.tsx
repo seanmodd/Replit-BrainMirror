@@ -101,65 +101,73 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tweets</CardTitle>
-            <Twitter className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <>
-                <div data-testid="text-total-tweets" className="text-2xl font-bold">{stats?.totalTweets ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Imported bookmarks</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/tweets">
+          <Card className="cursor-pointer hover:bg-foreground/[0.03] transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Tweets</CardTitle>
+              <Twitter className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+                <>
+                  <div data-testid="text-total-tweets" className="text-2xl font-bold">{stats?.totalTweets ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Imported bookmarks</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Author Hubs</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <>
-                <div data-testid="text-total-authors" className="text-2xl font-bold">{stats?.totalAuthors ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Generated index notes</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/authors">
+          <Card className="cursor-pointer hover:bg-foreground/[0.03] transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Author Hubs</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+                <>
+                  <div data-testid="text-total-authors" className="text-2xl font-bold">{stats?.totalAuthors ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Generated index notes</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Markdown Files</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <>
-                <div data-testid="text-total-files" className="text-2xl font-bold">{stats?.totalFiles ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Clean local files</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/files">
+          <Card className="cursor-pointer hover:bg-foreground/[0.03] transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Markdown Files</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+                <>
+                  <div data-testid="text-total-files" className="text-2xl font-bold">{stats?.totalFiles ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Clean local files</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tags Created</CardTitle>
-            <Hash className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <>
-                <div data-testid="text-total-tags" className="text-2xl font-bold">{stats?.totalTags ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Unique connections</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/tags">
+          <Card className="cursor-pointer hover:bg-foreground/[0.03] transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tags Created</CardTitle>
+              <Hash className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+                <>
+                  <div data-testid="text-total-tags" className="text-2xl font-bold">{stats?.totalTags ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Unique connections</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">

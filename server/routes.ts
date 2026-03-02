@@ -6,6 +6,25 @@ import { insertTweetNoteSchema, insertSettingsSchema, type TweetNote } from "@sh
 import { pushFilesToGitHub, getUncachableGitHubClient } from "./github";
 import { getAuthorizationUrl, exchangeCodeForTokens, isOAuthConnected, fetchBookmarks, getRedirectUriForDisplay, getOAuthUserId, fetchUserTweets } from "./xauth";
 
+function getRealAuthor(tweet: TweetNote): { handle: string; name: string } {
+  const content = tweet.content || "";
+  const isRt = tweet.source === "retweet" || content.startsWith("RT @");
+  if (isRt) {
+    const rtMatch = content.match(/^RT @([\w]+):\s*/);
+    if (rtMatch) {
+      return { handle: rtMatch[1], name: rtMatch[1] };
+    }
+  }
+  const urlMatch = tweet.tweetUrl?.match(/x\.com\/(\w+)\/status/);
+  const urlAuthor = urlMatch ? urlMatch[1] : null;
+  const storedHandle = tweet.authorHandle || "unknown";
+  const storedName = tweet.authorName || storedHandle;
+  if (urlAuthor && urlAuthor.toLowerCase() !== storedHandle.toLowerCase()) {
+    return { handle: urlAuthor, name: urlAuthor };
+  }
+  return { handle: storedHandle, name: storedName };
+}
+
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
   const date = new Date(tweet.createdAt).toISOString().split("T")[0];
   const contentTrunc = tweet.content.substring(0, 40).replace(/[^a-zA-Z0-9 ]/g, "").trim();
@@ -133,12 +152,29 @@ export async function registerRoutes(
 
   app.get("/api/stats", async (_req, res) => {
     try {
-      const [count, tags, authors, recentSyncs] = await Promise.all([
-        storage.getTweetNoteCount(),
+      const [allTweets, tags, recentSyncs] = await Promise.all([
+        storage.getAllTweetNotes(),
         storage.getUniqueTags(),
-        storage.getUniqueAuthors(),
         storage.getRecentSyncLogs(5),
       ]);
+      const ownUsername = (process.env.X_USERNAME || "").toLowerCase();
+      const authorMap = new Map<string, { handle: string; name: string; count: number }>();
+      for (const tweet of allTweets) {
+        const real = getRealAuthor(tweet);
+        const key = real.handle.toLowerCase();
+        if (key === ownUsername || key === "unknown") continue;
+        const existing = authorMap.get(key);
+        if (existing) {
+          existing.count++;
+          if (real.name !== real.handle && existing.name === existing.handle) {
+            existing.name = real.name;
+          }
+        } else {
+          authorMap.set(key, { handle: real.handle, name: real.name, count: 1 });
+        }
+      }
+      const authors = Array.from(authorMap.values()).sort((a, b) => b.count - a.count);
+      const count = allTweets.length;
       res.json({
         totalTweets: count,
         totalAuthors: authors.length,
@@ -158,7 +194,20 @@ export async function registerRoutes(
   app.get("/api/graph", async (_req, res) => {
     try {
       const tweets = await storage.getAllTweetNotes();
-      const authors = await storage.getUniqueAuthors();
+      const ownUsername = (process.env.X_USERNAME || "").toLowerCase();
+      const authorMap = new Map<string, { handle: string; name: string; count: number }>();
+      for (const tweet of tweets) {
+        const real = getRealAuthor(tweet);
+        const key = real.handle.toLowerCase();
+        if (key === ownUsername || key === "unknown") continue;
+        const existing = authorMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          authorMap.set(key, { handle: real.handle, name: real.name, count: 1 });
+        }
+      }
+      const authors = Array.from(authorMap.values()).sort((a, b) => b.count - a.count);
 
       const nodes: any[] = [];
       const links: any[] = [];
@@ -223,7 +272,10 @@ export async function registerRoutes(
           group: "Author",
           color: "#7C3AED",
         });
-        tweets.filter(t => t.authorHandle === author.handle).forEach(t => {
+        tweets.filter(t => {
+          const real = getRealAuthor(t);
+          return real.handle.toLowerCase() === author.handle.toLowerCase();
+        }).forEach(t => {
           addLink(hubId, t.id);
         });
       });
