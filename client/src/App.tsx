@@ -13,6 +13,7 @@ import TweetsPage from "@/pages/TweetsPage";
 import AuthorsPage from "@/pages/AuthorsPage";
 import FilesPage from "@/pages/FilesPage";
 import TagsPage from "@/pages/TagsPage";
+import TimelinePage from "@/pages/TimelinePage";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
         <Route path="/authors" component={AuthorsPage} />
         <Route path="/files" component={FilesPage} />
         <Route path="/tags" component={TagsPage} />
+        <Route path="/timeline" component={TimelinePage} />
         <Route path="/bookmarks" component={BookmarksView} />
         <Route path="/graph" component={GraphView} />
         <Route path="/settings" component={Settings} />

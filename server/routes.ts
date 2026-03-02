@@ -25,15 +25,111 @@ function getRealAuthor(tweet: TweetNote): { handle: string; name: string } {
   return { handle: storedHandle, name: storedName };
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function autoGenerateTags(tweet: TweetNote): string[] {
+  const tags = new Set<string>();
+
+  const existingTags = tweet.tags || [];
+  for (const t of existingTags) {
+    tags.add(t.startsWith("#") ? t : `#${t}`);
+  }
+
+  const hashtagMatches = tweet.content.match(/#(\w+)/g);
+  if (hashtagMatches) {
+    for (const ht of hashtagMatches) {
+      tags.add(ht);
+    }
+  }
+
+  if (tweet.source) {
+    tags.add(`#source/${tweet.source}`);
+  }
+
+  const mediaUrls = (tweet.mediaUrls || []).filter(u => u && u !== "");
+  if (mediaUrls.length > 0) {
+    tags.add("#has-media");
+  }
+  if (tweet.quotedTweetId || tweet.quotedTweetContent) {
+    tags.add("#has-quote");
+  }
+  if (tweet.inReplyToTweetId) {
+    tags.add("#reply");
+  }
+  if (tweet.content.startsWith("RT @")) {
+    tags.add("#retweet");
+  }
+
+  const mentionMatches = tweet.content.match(/@(\w+)/g);
+  if (mentionMatches) {
+    for (const m of mentionMatches) {
+      tags.add(`#mention/${m.slice(1)}`);
+    }
+  }
+
+  const topicKeywords: Record<string, string[]> = {
+    "topic/ai": ["AI", "artificial intelligence", "machine learning", "ML", "GPT", "LLM", "neural network", "deep learning", "ChatGPT", "OpenAI", "AGI"],
+    "topic/crypto": ["crypto", "bitcoin", "ethereum", "blockchain", "web3", "NFT", "DeFi", "BTC", "ETH"],
+    "topic/programming": ["coding", "programming", "developer", "software", "API", "JavaScript", "Python", "TypeScript", "React", "code", "frontend", "backend", "fullstack"],
+    "topic/startup": ["startup", "founder", "fundraising", "venture capital", "VC", "seed round", "Series A", "YC", "accelerator"],
+    "topic/design": ["design", "UX", "UI", "Figma", "typography", "branding", "CSS"],
+    "topic/productivity": ["productivity", "workflow", "automation", "efficiency", "habit", "routine", "time management"],
+    "topic/marketing": ["marketing", "SEO", "growth", "content marketing", "social media", "branding", "audience"],
+    "topic/finance": ["finance", "investing", "stock", "market", "portfolio", "trading", "economy"],
+    "topic/writing": ["writing", "copywriting", "newsletter", "blogging", "content creation", "storytelling"],
+  };
+
+  const contentLower = tweet.content.toLowerCase();
+  for (const [topic, keywords] of Object.entries(topicKeywords)) {
+    for (const kw of keywords) {
+      if (contentLower.includes(kw.toLowerCase())) {
+        tags.add(`#${topic}`);
+        break;
+      }
+    }
+  }
+
+  const urlMatches = tweet.content.match(/https?:\/\/[^\s]+/g);
+  if (urlMatches && urlMatches.length > 0) {
+    tags.add("#has-links");
+  }
+
+  if (tweet.content.length > 200) {
+    tags.add("#long-form");
+  }
+
+  return Array.from(tags).sort();
+}
+
+function getDateParts(dateStr: string): { year: string; month: string; monthName: string; day: string; dateIso: string } {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    return { year: "unknown", month: "00", monthName: "Unknown", day: "00", dateIso: "unknown" };
+  }
+  const year = d.getUTCFullYear().toString();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const monthName = MONTH_NAMES[d.getUTCMonth()];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const dateIso = `${year}-${month}-${day}`;
+  return { year, month, monthName, day, dateIso };
+}
+
 function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
-  const date = new Date(tweet.createdAt).toISOString().split("T")[0];
+  const { year, month, monthName, day, dateIso } = getDateParts(tweet.createdAt);
   const contentTrunc = tweet.content.substring(0, 40).replace(/[^a-zA-Z0-9 ]/g, "").trim();
   const filename = filenameTemplate
     .replace("{author_handle}", tweet.authorHandle)
     .replace("{content_trunc_40}", contentTrunc)
-    .replace("{date}", date)
+    .replace("{date}", dateIso)
     + ".md";
   const safeName = filename.replace(/[/\\?%*:|"<>]/g, "-");
+
+  const folderPath = `${year}/${month}-${monthName}/${day}`;
+
+  const allTags = autoGenerateTags(tweet);
 
   const frontmatter = [
     "---",
@@ -41,11 +137,15 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
     `author_handle: ${tweet.authorHandle}`,
     `author_name: ${tweet.authorName}`,
     `created_at: ${tweet.createdAt}`,
+    `date: ${dateIso}`,
+    `year: ${year}`,
+    `month: ${month}-${monthName}`,
+    `day: ${day}`,
     `source: ${tweet.source || "manual"}`,
     tweet.threadPosition ? `thread_position: ${tweet.threadPosition}` : null,
     `conversation_id: ${tweet.conversationId}`,
     `tweet_id: ${tweet.tweetId}`,
-    `tags: [${(tweet.tags || []).join(", ")}]`,
+    `tags: [${allTags.join(", ")}]`,
     tweet.quotedTweetId ? `quoted_tweet_id: ${tweet.quotedTweetId}` : null,
     tweet.inReplyToTweetId ? `in_reply_to_tweet_id: ${tweet.inReplyToTweetId}` : null,
     (tweet.mediaUrls || []).filter(u => u).length > 0 ? `media_count: ${tweet.mediaUrls!.filter(u => u).length}` : null,
@@ -85,7 +185,7 @@ function generateMarkdown(tweet: TweetNote, filenameTemplate: string) {
 
   const content = sections.join("\n");
 
-  return { filename: safeName, content };
+  return { filename: safeName, content, folderPath };
 }
 
 export async function registerRoutes(
@@ -884,7 +984,8 @@ export async function registerRoutes(
       archive.pipe(res);
 
       for (const file of files) {
-        archive.append(file.content, { name: file.filename });
+        const fullPath = file.folderPath ? `${file.folderPath}/${file.filename}` : file.filename;
+        archive.append(file.content, { name: fullPath });
       }
 
       await archive.finalize();
@@ -919,7 +1020,11 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No notes to push." });
       }
       const s = await storage.getSettings();
-      const files = tweets.map(t => generateMarkdown(t, s.filenameTemplate));
+      const files = tweets.map(t => {
+        const md = generateMarkdown(t, s.filenameTemplate);
+        const datePath = md.folderPath ? `${md.folderPath}/${md.filename}` : md.filename;
+        return { filename: datePath, content: md.content };
+      });
       const result = await pushFilesToGitHub(owner, repo, files, folder || "");
       res.json(result);
     } catch (err: any) {

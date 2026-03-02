@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, BookmarkCheck, Network, Settings, Twitter, Menu } from "lucide-react";
+import { LayoutDashboard, BookmarkCheck, Network, Settings, Twitter, Menu, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface LayoutProps {
@@ -35,6 +35,13 @@ export default function Layout({ children }: LayoutProps) {
             <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/bookmarks" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
               <BookmarkCheck size={18} />
               <span className="text-sm">Bookmarks</span>
+            </div>
+          </Link>
+          
+          <Link href="/timeline">
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${location === "/timeline" ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <CalendarDays size={18} />
+              <span className="text-sm">Timeline</span>
             </div>
           </Link>
           
