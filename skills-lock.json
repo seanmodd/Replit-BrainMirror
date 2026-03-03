@@ -20,6 +20,16 @@
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "9b03bb78ec5c81c4e0546dbb78cfc970368c72dcae5482e8c59690175abbc8e7"
+    },
+    "twitter-automation": {
+      "source": "skill-zero/s",
+      "sourceType": "github",
+      "computedHash": "8e7c963e2737448b34bb29e973fea9f2638c5e4566624ed3ec71a95a04e1b3c5"
+    },
+    "twitter-thread-creation": {
+      "source": "skill-zero/s",
+      "sourceType": "github",
+      "computedHash": "c71791c1a82cc82f4349370020ecb970a88e6e7cbf3e50a6404c464e7d331c75"
     }
   }
 }
