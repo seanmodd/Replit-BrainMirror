@@ -1188,76 +1188,77 @@ export async function registerRoutes(
   app.get("/api/thread/:conversationId", async (req, res) => {
     try {
       const bearerToken = process.env.X_BEARER_TOKEN;
-      if (!bearerToken) {
-        return res.status(401).json({ message: "No bearer token configured" });
-      }
-
       const conversationId = req.params.conversationId;
-      const params = new URLSearchParams({
-        query: `conversation_id:${conversationId}`,
-        "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
-        "user.fields": "name,username,profile_image_url",
-        "media.fields": "url,preview_image_url,type,variants",
-        expansions: "author_id,attachments.media_keys,referenced_tweets.id",
-        max_results: "100",
-      });
-
-      const searchResponse = await fetch(
-        `https://api.x.com/2/tweets/search/recent?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${bearerToken}` } }
-      );
-
-      const rootParams = new URLSearchParams({
-        "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
-        "user.fields": "name,username,profile_image_url",
-        "media.fields": "url,preview_image_url,type,variants",
-        expansions: "author_id,attachments.media_keys",
-      });
-
-      const rootResponse = await fetch(
-        `https://api.x.com/2/tweets/${conversationId}?${rootParams.toString()}`,
-        { headers: { Authorization: `Bearer ${bearerToken}` } }
-      );
 
       const threadTweets: any[] = [];
       const authorMap = new Map<string, any>();
       const mediaMap = new Map<string, any>();
       const refTweetMap = new Map<string, any>();
-      let xApiFailed = !rootResponse.ok && !searchResponse.ok;
+      let xApiFailed = !bearerToken;
 
-      if (rootResponse.ok) {
-        const rootData = await rootResponse.json();
-        if (rootData.data) {
-          threadTweets.push(rootData.data);
-        }
-        if (rootData.includes?.users) {
-          for (const u of rootData.includes.users) authorMap.set(u.id, u);
-        }
-        if (rootData.includes?.media) {
-          for (const m of rootData.includes.media) mediaMap.set(m.media_key, m);
-        }
-        if (rootData.includes?.tweets) {
-          for (const rt of rootData.includes.tweets) refTweetMap.set(rt.id, rt);
-        }
-      }
+      if (bearerToken) {
+        const params = new URLSearchParams({
+          query: `conversation_id:${conversationId}`,
+          "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
+          "user.fields": "name,username,profile_image_url",
+          "media.fields": "url,preview_image_url,type,variants",
+          expansions: "author_id,attachments.media_keys,referenced_tweets.id",
+          max_results: "100",
+        });
 
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        if (searchData.data) {
-          for (const tw of searchData.data) {
-            if (!threadTweets.find(t => t.id === tw.id)) {
-              threadTweets.push(tw);
-            }
+        const searchResponse = await fetch(
+          `https://api.x.com/2/tweets/search/recent?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${bearerToken}` } }
+        );
+
+        const rootParams = new URLSearchParams({
+          "tweet.fields": "created_at,conversation_id,in_reply_to_user_id,referenced_tweets,entities,author_id,attachments,text",
+          "user.fields": "name,username,profile_image_url",
+          "media.fields": "url,preview_image_url,type,variants",
+          expansions: "author_id,attachments.media_keys",
+        });
+
+        const rootResponse = await fetch(
+          `https://api.x.com/2/tweets/${conversationId}?${rootParams.toString()}`,
+          { headers: { Authorization: `Bearer ${bearerToken}` } }
+        );
+
+        xApiFailed = !rootResponse.ok && !searchResponse.ok;
+
+        if (rootResponse.ok) {
+          const rootData = await rootResponse.json();
+          if (rootData.data) {
+            threadTweets.push(rootData.data);
+          }
+          if (rootData.includes?.users) {
+            for (const u of rootData.includes.users) authorMap.set(u.id, u);
+          }
+          if (rootData.includes?.media) {
+            for (const m of rootData.includes.media) mediaMap.set(m.media_key, m);
+          }
+          if (rootData.includes?.tweets) {
+            for (const rt of rootData.includes.tweets) refTweetMap.set(rt.id, rt);
           }
         }
-        if (searchData.includes?.users) {
-          for (const u of searchData.includes.users) authorMap.set(u.id, u);
-        }
-        if (searchData.includes?.media) {
-          for (const m of searchData.includes.media) mediaMap.set(m.media_key, m);
-        }
-        if (searchData.includes?.tweets) {
-          for (const rt of searchData.includes.tweets) refTweetMap.set(rt.id, rt);
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          if (searchData.data) {
+            for (const tw of searchData.data) {
+              if (!threadTweets.find(t => t.id === tw.id)) {
+                threadTweets.push(tw);
+              }
+            }
+          }
+          if (searchData.includes?.users) {
+            for (const u of searchData.includes.users) authorMap.set(u.id, u);
+          }
+          if (searchData.includes?.media) {
+            for (const m of searchData.includes.media) mediaMap.set(m.media_key, m);
+          }
+          if (searchData.includes?.tweets) {
+            for (const rt of searchData.includes.tweets) refTweetMap.set(rt.id, rt);
+          }
         }
       }
 
