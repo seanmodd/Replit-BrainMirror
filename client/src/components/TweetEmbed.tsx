@@ -36,7 +36,7 @@ export default function TweetEmbed({ tweetUrl, tweetId }: TweetEmbedProps) {
           conversation: "none",
           dnt: true,
           align: "center",
-          width: 500,
+          width: 400,
         }).then((el: any) => {
           setLoading(false);
           if (!el) setError(true);
