@@ -3,13 +3,11 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag } from "lucide-react";
+import { Twitter, RefreshCw, FileText, Hash, Users, ExternalLink, Loader2, Bookmark, Repeat2, Globe, Pencil, Github, Sparkles, CalendarDays, Tag, MessageCircle, Heart, BarChart2, Share, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { getAutoTags } from "@/lib/utils";
-import TweetThreadModal from "@/components/TweetThreadModal";
-import TweetEmbed from "@/components/TweetEmbed";
+import { getAutoTags, getDisplayInfo, formatContent, formatTimeAgo, isVideoUrl, proxyImageUrl, getLinkCards } from "@/lib/utils";
 import { useMemo, useState } from "react";
 
 const MONTH_NAMES = [
@@ -68,9 +66,236 @@ function groupTweetsByDate(tweets: any[]): DateGroup[] {
   return groups;
 }
 
+function TimelineTweetCard({ tweet, allTweets }: { tweet: any; allTweets: any[] }) {
+  const [repliesExpanded, setRepliesExpanded] = useState(false);
+  const { displayName, displayHandle, displayContent, isRetweet, retweetedBy } = getDisplayInfo(tweet);
+  const mediaUrls = (tweet.mediaUrls || []).filter((u: string) => u && u !== "");
+  const linkCards = getLinkCards(tweet);
+
+  const replies = useMemo(() => {
+    const convId = tweet.conversationId;
+    if (!convId) return [];
+    const inThread = allTweets.filter(
+      (t: any) => t.id !== tweet.id && (
+        t.conversationId === convId ||
+        t.inReplyToTweetId === tweet.tweetId ||
+        tweet.inReplyToTweetId === t.tweetId
+      )
+    );
+    const unique = Array.from(new Map(inThread.map((t: any) => [t.id, t])).values());
+    unique.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return unique;
+  }, [tweet, allTweets]);
+
+  const replyCount = replies.length;
+
+  return (
+    <div>
+      <div className="px-4 py-3">
+        {isRetweet && (
+          <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-1 ml-[52px]">
+            <Repeat2 size={14} />
+            <span className="font-bold">{retweetedBy ? `${retweetedBy} reposted` : "You reposted"}</span>
+          </div>
+        )}
+        <div className="flex gap-3">
+          <div className="shrink-0">
+            {tweet.authorProfileImageUrl ? (
+              <img
+                src={proxyImageUrl(tweet.authorProfileImageUrl)}
+                alt={displayName}
+                className="w-10 h-10 rounded-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+              />
+            ) : null}
+            <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-sm ${tweet.authorProfileImageUrl ? 'hidden' : ''}`}>
+              {displayName?.[0]?.toUpperCase() || "?"}
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="font-bold text-[15px] text-foreground truncate">{displayName}</span>
+                <span className="text-muted-foreground text-[15px] truncate">@{displayHandle}</span>
+                <span className="text-muted-foreground text-[15px] shrink-0">·</span>
+                <span className="text-muted-foreground text-[15px] shrink-0">{formatTimeAgo(tweet.createdAt)}</span>
+                {tweet.source === "bookmark" && <Bookmark size={13} className="text-[#1d9bf0] fill-[#1d9bf0] shrink-0 ml-0.5" />}
+                {tweet.source === "retweet" && <Repeat2 size={13} className="text-[#00ba7c] shrink-0 ml-0.5" />}
+                {tweet.source === "public" && <Globe size={13} className="text-[#A78BFA] shrink-0 ml-0.5" />}
+                {tweet.source === "manual" && <Pencil size={13} className="text-muted-foreground shrink-0 ml-0.5" />}
+              </div>
+              <a
+                href={tweet.tweetUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-2 rounded-full text-muted-foreground hover:text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors"
+              >
+                <ExternalLink size={15} />
+              </a>
+            </div>
+
+            <div className="text-[15px] text-foreground leading-[20px] mt-0.5 whitespace-pre-wrap break-words">
+              {formatContent(displayContent)}
+            </div>
+
+            {mediaUrls.length > 0 && (
+              <div className={`mt-3 rounded-2xl overflow-hidden border border-border ${mediaUrls.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+                {mediaUrls.map((url: string, i: number) =>
+                  isVideoUrl(url) ? (
+                    <div key={i} className={`relative bg-black ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}>
+                      <video
+                        src={proxyImageUrl(url)}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className={`w-full object-contain ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      key={i}
+                      src={proxyImageUrl(url)}
+                      alt=""
+                      className={`w-full object-cover ${mediaUrls.length === 1 ? "max-h-[300px]" : "h-[150px]"}`}
+                      loading="lazy"
+                    />
+                  )
+                )}
+              </div>
+            )}
+
+            {linkCards.length > 0 && mediaUrls.length === 0 && (
+              <a href={linkCards[0].url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors block">
+                {linkCards[0].image && <img src={proxyImageUrl(linkCards[0].image)} alt="" className="w-full h-[200px] object-cover border-b border-border" loading="lazy" />}
+                <div className="px-3 py-2">
+                  {linkCards[0].displayUrl && <div className="text-[12px] text-muted-foreground truncate">{linkCards[0].displayUrl}</div>}
+                  {linkCards[0].title && <div className="text-[13px] text-foreground leading-[16px] truncate">{linkCards[0].title}</div>}
+                  {linkCards[0].description && <div className="text-[12px] text-muted-foreground leading-[14px] line-clamp-2 mt-0.5">{linkCards[0].description}</div>}
+                </div>
+              </a>
+            )}
+
+            {tweet.quotedTweetContent && tweet.quotedTweetAuthorHandle && (
+              <div className="mt-3 border border-border rounded-2xl overflow-hidden hover:bg-foreground/[0.03] transition-colors">
+                <div className="p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-[10px]">
+                      {(tweet.quotedTweetAuthorName || tweet.quotedTweetAuthorHandle)?.[0]?.toUpperCase() || "?"}
+                    </div>
+                    <span className="font-bold text-[13px] text-foreground">{tweet.quotedTweetAuthorName || tweet.quotedTweetAuthorHandle}</span>
+                    <span className="text-muted-foreground text-[13px]">@{tweet.quotedTweetAuthorHandle}</span>
+                  </div>
+                  <div className="text-[14px] text-foreground leading-[18px] whitespace-pre-wrap break-words line-clamp-4">
+                    {formatContent(tweet.quotedTweetContent || "")}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-3 max-w-[425px] -ml-2">
+              <button
+                data-testid={`button-replies-${tweet.id}`}
+                className={`flex items-center gap-1 p-2 rounded-full transition-colors ${replyCount > 0 ? 'text-[#1d9bf0] hover:bg-[#1d9bf0]/10 cursor-pointer' : 'text-muted-foreground'}`}
+                onClick={(e) => { e.stopPropagation(); if (replyCount > 0) setRepliesExpanded(!repliesExpanded); }}
+              >
+                <MessageCircle size={16} />
+                {replyCount > 0 && <span className="text-[13px]">{replyCount}</span>}
+              </button>
+              <span className="flex items-center gap-1 p-2 rounded-full text-muted-foreground">
+                <Repeat2 size={16} />
+              </span>
+              <span className="flex items-center gap-1 p-2 rounded-full text-muted-foreground">
+                <Heart size={16} />
+              </span>
+              <span className="flex items-center gap-1 p-2 rounded-full text-muted-foreground">
+                <BarChart2 size={16} />
+              </span>
+              <div className="flex items-center">
+                <span className="p-2 rounded-full text-muted-foreground">
+                  <Bookmark size={16} className={tweet.source === "bookmark" ? "fill-[#1d9bf0] text-[#1d9bf0]" : ""} />
+                </span>
+                <span className="p-2 rounded-full text-muted-foreground">
+                  <Share size={16} />
+                </span>
+              </div>
+            </div>
+
+            {replyCount > 0 && (
+              <button
+                data-testid={`button-toggle-replies-${tweet.id}`}
+                className="flex items-center gap-1.5 mt-1 text-[13px] text-[#1d9bf0] hover:underline cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setRepliesExpanded(!repliesExpanded); }}
+              >
+                {repliesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                {repliesExpanded ? "Hide" : "Read"} {replyCount} {replyCount === 1 ? "reply" : "replies"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {repliesExpanded && replies.length > 0 && (
+        <div className="border-t border-border bg-foreground/[0.02]">
+          {replies.map((reply: any, idx: number) => {
+            const replyInfo = getDisplayInfo(reply);
+            const replyMedia = (reply.mediaUrls || []).filter((u: string) => u && u !== "");
+            return (
+              <div key={reply.id} className={`px-4 py-3 ${idx < replies.length - 1 ? 'border-b border-border/50' : ''}`}>
+                <div className="flex gap-3">
+                  <div className="shrink-0 flex flex-col items-center">
+                    <div className="w-2 h-2 rounded-full bg-border mb-1 mt-2" />
+                    {idx < replies.length - 1 && <div className="w-0.5 flex-1 bg-border/50" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      {reply.authorProfileImageUrl ? (
+                        <img
+                          src={proxyImageUrl(reply.authorProfileImageUrl)}
+                          alt={replyInfo.displayName}
+                          className="w-6 h-6 rounded-full object-cover mr-1"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-foreground font-bold text-[9px] mr-1">
+                          {replyInfo.displayName?.[0]?.toUpperCase() || "?"}
+                        </div>
+                      )}
+                      <span className="font-bold text-[13px] text-foreground truncate">{replyInfo.displayName}</span>
+                      <span className="text-muted-foreground text-[13px] truncate">@{replyInfo.displayHandle}</span>
+                      <span className="text-muted-foreground text-[13px]">·</span>
+                      <span className="text-muted-foreground text-[13px] shrink-0">{formatTimeAgo(reply.createdAt)}</span>
+                    </div>
+                    <div className="text-[14px] text-foreground/90 leading-[19px] mt-1 whitespace-pre-wrap break-words">
+                      {formatContent(replyInfo.displayContent)}
+                    </div>
+                    {replyMedia.length > 0 && (
+                      <div className={`mt-2 rounded-xl overflow-hidden border border-border ${replyMedia.length > 1 ? "grid grid-cols-2 gap-0.5" : ""}`}>
+                        {replyMedia.map((url: string, i: number) =>
+                          isVideoUrl(url) ? (
+                            <div key={i} className="relative bg-black h-[120px]">
+                              <video src={proxyImageUrl(url)} controls playsInline preload="metadata" className="w-full object-contain h-[120px]" onClick={(e) => e.stopPropagation()} />
+                            </div>
+                          ) : (
+                            <img key={i} src={proxyImageUrl(url)} alt="" className="w-full object-cover h-[120px]" loading="lazy" />
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { toast } = useToast();
-  const [threadTweet, setThreadTweet] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
@@ -436,8 +661,8 @@ export default function Dashboard() {
                           {dayTweets.map((tweet: any) => {
                             const autoTags = getAutoTags(tweet);
                             return (
-                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`} className="py-2 cursor-pointer" onClick={() => setThreadTweet(tweet)}>
-                                <TweetEmbed tweetUrl={tweet.tweetUrl} tweetId={tweet.id} />
+                              <article key={tweet.id} data-testid={`timeline-tweet-${tweet.id}`}>
+                                <TimelineTweetCard tweet={tweet} allTweets={tweets || []} />
                                 {autoTags.length > 0 && (
                                   <div className="flex flex-wrap gap-1 px-4 pb-2">
                                     {autoTags.map((tag, i) => (
@@ -462,12 +687,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      <TweetThreadModal
-        tweet={threadTweet}
-        allTweets={tweets || []}
-        open={!!threadTweet}
-        onOpenChange={(open: boolean) => { if (!open) setThreadTweet(null); }}
-      />
     </div>
   );
 }
